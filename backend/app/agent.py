@@ -13,6 +13,10 @@ from google.adk.tools.agent_tool import AgentTool
 from google.genai import types as genai_types
 
 from .config import config
+from .tools.compare_statements import compare_fed_statements
+from .tools.fetch_transcript import fetch_fomc_transcript
+from .tools.market_data import get_price_history, get_ticker_overview
+from .tools.rate_probability import get_rate_move_probability
 from .tools.search import tavily_search
 
 
@@ -165,8 +169,23 @@ section_researcher = LlmAgent(
 
     **Final Output:** Present all research summaries and deliverable artifacts clearly.
     When referencing facts, note the [src-N] IDs from the search results so the report composer can cite them.
+
+    **Financial Domain Tools:**
+    - For public-company or ticker-specific questions, use `get_ticker_overview` for current fundamentals and
+      `get_price_history` for recent OHLCV context.
+    - For Federal Reserve rate-decision questions, use `get_rate_move_probability` for FRED-based rate context
+      and best-effort implied probability extraction.
+    - For comparing two FOMC statement PDFs, use `compare_fed_statements`.
+    - For a specific FOMC meeting transcript or minutes, use `fetch_fomc_transcript`.
     """,
-    tools=[tavily_search],
+    tools=[
+        tavily_search,
+        get_ticker_overview,
+        get_price_history,
+        get_rate_move_probability,
+        compare_fed_statements,
+        fetch_fomc_transcript,
+    ],
     output_key="section_research_findings",
 )
 
@@ -221,8 +240,18 @@ enhanced_search_executor = LlmAgent(
     3. Each search result includes a [src-N] citation ID — record these alongside the content.
     4. Synthesize new findings and COMBINE them with existing 'section_research_findings'.
     5. Your output MUST be the new, complete, improved set of research findings with all [src-N] IDs preserved.
+
+    Use the same financial domain tools as the first research pass when follow-up work requires ticker data,
+    price history, Fed rate probability context, FOMC statement comparisons, or FOMC transcripts/minutes.
     """,
-    tools=[tavily_search],
+    tools=[
+        tavily_search,
+        get_ticker_overview,
+        get_price_history,
+        get_rate_move_probability,
+        compare_fed_statements,
+        fetch_fomc_transcript,
+    ],
     output_key="section_research_findings",
 )
 
