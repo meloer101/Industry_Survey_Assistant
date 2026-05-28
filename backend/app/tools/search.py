@@ -1,0 +1,50 @@
+import os
+
+from google.adk.tools import ToolContext
+from tavily import TavilyClient
+
+
+def tavily_search(query: str, tool_context: ToolContext) -> str:
+    """Search the web and return results with source IDs for citation.
+
+    Args:
+        query: The search query string.
+        tool_context: ADK tool context providing session state access.
+
+    Returns:
+        Formatted search results, each prefixed with a [src-N] citation ID.
+    """
+    client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+    response = client.search(query, search_depth="basic", max_results=5)
+
+    url_to_short_id: dict = tool_context.state.get("url_to_short_id", {})
+    sources: dict = tool_context.state.get("sources", {})
+    id_counter = len(url_to_short_id) + 1
+
+    formatted: list[str] = []
+    for result in response.get("results", []):
+        url: str = result.get("url", "")
+        title: str = result.get("title", url)
+        content: str = result.get("content", "")
+        domain: str = url.split("/")[2] if url else ""
+
+        if url not in url_to_short_id:
+            short_id = f"src-{id_counter}"
+            url_to_short_id[url] = short_id
+            sources[short_id] = {
+                "short_id": short_id,
+                "title": title,
+                "url": url,
+                "domain": domain,
+                "supported_claims": [],
+            }
+            id_counter += 1
+        else:
+            short_id = url_to_short_id[url]
+
+        formatted.append(f"[{short_id}] **{title}**\nURL: {url}\n{content}")
+
+    tool_context.state["url_to_short_id"] = url_to_short_id
+    tool_context.state["sources"] = sources
+
+    return "\n\n---\n\n".join(formatted) if formatted else "No results found."
