@@ -11,6 +11,7 @@ import requests
 FED_FILES_BASE = "https://www.federalreserve.gov/monetarypolicy/files"
 MAX_RETURN_CHARS = 8000
 REQUEST_TIMEOUT = 30
+LIKELY_FOMC_MEETING_DAYS = (18, 19, 20, 17, 16, 15, 14, 13, 12, 29, 30, 31)
 
 
 def _extract_pdf_text(pdf_bytes: bytes) -> str:
@@ -50,7 +51,7 @@ def _candidate_urls(year: int, month: int) -> list[str]:
     urls = [f"{FED_FILES_BASE}/FOMC{year}{month:02d}meeting.pdf"]
     urls.extend(
         f"{FED_FILES_BASE}/fomcminutes{year}{month:02d}{day:02d}.pdf"
-        for day in range(31, 0, -1)
+        for day in LIKELY_FOMC_MEETING_DAYS
     )
     return urls
 

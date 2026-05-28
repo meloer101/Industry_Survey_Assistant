@@ -35,18 +35,54 @@ def _latest_fedfunds() -> tuple[str, float] | None:
     return None
 
 
+def _classify_probability_context(context: str) -> str | None:
+    normalized = context.lower()
+    has_25bp = bool(re.search(r"25\s*(?:bp|basis point)|quarter-point|0\.25", normalized))
+
+    if re.search(r"no change|unchanged|hold(?:ing)?(?: steady)?", normalized):
+        return "no_change"
+    if has_25bp and re.search(r"cut|lower|reduction|ease", normalized):
+        return "cut_25bp"
+    if has_25bp and re.search(r"hike|increase|raise", normalized):
+        return "hike_25bp"
+    return None
+
+
+def _store_probability(probabilities: dict[str, float], key: str | None, value: str) -> None:
+    if key and key not in probabilities:
+        probabilities[key] = round(float(value) / 100, 4)
+
+
 def _extract_probabilities(text: str) -> dict[str, float]:
-    lower_text = text.lower()
     probabilities: dict[str, float] = {}
-    patterns = {
-        "cut_25bp": r"(?:25\s*(?:bp|basis point)|quarter-point|0\.25).*?(\d+(?:\.\d+)?)\s*%",
-        "no_change": r"(?:no change|hold|unchanged).*?(\d+(?:\.\d+)?)\s*%",
-        "hike_25bp": r"(?:hike|increase).*?(?:25\s*(?:bp|basis point)|quarter-point|0\.25).*?(\d+(?:\.\d+)?)\s*%",
-    }
-    for key, pattern in patterns.items():
-        match = re.search(pattern, lower_text)
-        if match:
-            probabilities[key] = round(float(match.group(1)) / 100, 4)
+    normalized = re.sub(r"\s+", " ", text)
+
+    percent_before_action = re.compile(
+        r"(\d+(?:\.\d+)?)\s*%\s*(?:probability|chance|odds)?\s*(?:of|for)?\s*(?:a|an)?\s*"
+        r"(.{0,80}?)(?=,|;|\.|\band\s+\d+(?:\.\d+)?\s*%|$)",
+        re.IGNORECASE,
+    )
+    for match in percent_before_action.finditer(normalized):
+        _store_probability(
+            probabilities,
+            _classify_probability_context(match.group(2)),
+            match.group(1),
+        )
+
+    action_before_percent = re.compile(
+        r"((?:no change|unchanged|hold(?:ing)?(?: steady)?|"
+        r"(?:(?:25\s*(?:bp|basis point)|quarter-point|0\.25).{0,30}?(?:cut|lower|reduction|ease|hike|increase|raise))|"
+        r"(?:(?:cut|lower|reduction|ease|hike|increase|raise).{0,30}?(?:25\s*(?:bp|basis point)|quarter-point|0\.25)))"
+        r".{0,60}?)(\d+(?:\.\d+)?)\s*%",
+        re.IGNORECASE,
+    )
+    for match in action_before_percent.finditer(normalized):
+        _store_probability(
+            probabilities,
+            _classify_probability_context(match.group(1)),
+            match.group(2),
+        )
+
     return probabilities
 
 
