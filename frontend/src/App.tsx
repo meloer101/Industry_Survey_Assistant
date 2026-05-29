@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { v4 as uuidv4 } from 'uuid';
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatMessagesView } from "@/components/ChatMessagesView";
+import type { AnalysisOutputs } from "@/components/AnalysisPanel";
 
 // Update DisplayData to be a string type
 type DisplayData = string | null;
@@ -11,6 +12,7 @@ interface MessageWithAgent {
   id: string;
   agent?: string;
   finalReportWithCitations?: boolean;
+  analysisOutputs?: AnalysisOutputs;
 }
 
 interface ProcessedEvent {
@@ -31,6 +33,7 @@ export default function App() {
   const [isCheckingBackend, setIsCheckingBackend] = useState(true);
   const currentAgentRef = useRef('');
   const accumulatedTextRef = useRef("");
+  const analysisOutputsRef = useRef<AnalysisOutputs>({});
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const retryWithBackoff = async (
@@ -162,13 +165,21 @@ export default function App() {
         console.log('[SSE EXTRACT] Sources found:', sources); // DEBUG
       }
 
+      // Extract analysis agent outputs from stateDelta
+      let newAnalysisOutputs: AnalysisOutputs = {};
+      if (parsed.actions?.stateDelta) {
+        const delta = parsed.actions.stateDelta;
+        if (delta.macro_analysis_output) newAnalysisOutputs.macro = delta.macro_analysis_output;
+        if (delta.fundamental_analysis_output) newAnalysisOutputs.fundamental = delta.fundamental_analysis_output;
+        if (delta.risk_analysis_output) newAnalysisOutputs.risk = delta.risk_analysis_output;
+      }
 
-      return { textParts, agent, finalReportWithCitations, functionCall, functionResponse, sourceCount, sources };
+      return { textParts, agent, finalReportWithCitations, functionCall, functionResponse, sourceCount, sources, newAnalysisOutputs };
     } catch (error) {
       // Log the error and a truncated version of the problematic data for easier debugging.
       const truncatedData = data.length > 200 ? data.substring(0, 200) + "..." : data;
       console.error('Error parsing SSE data. Raw data (truncated): "', truncatedData, '". Error details:', error);
-      return { textParts: [], agent: '', finalReportWithCitations: undefined, functionCall: null, functionResponse: null, sourceCount: 0, sources: null };
+      return { textParts: [], agent: '', finalReportWithCitations: undefined, functionCall: null, functionResponse: null, sourceCount: 0, sources: null, newAnalysisOutputs: {} };
     }
   };
 
@@ -221,7 +232,22 @@ export default function App() {
   };
 
   const processSseEventData = (jsonData: string, aiMessageId: string) => {
-    const { textParts, agent, finalReportWithCitations, functionCall, functionResponse, sourceCount, sources } = extractDataFromSSE(jsonData);
+    const { textParts, agent, finalReportWithCitations, functionCall, functionResponse, sourceCount, sources, newAnalysisOutputs } = extractDataFromSSE(jsonData);
+
+    if (Object.keys(newAnalysisOutputs).length > 0) {
+      analysisOutputsRef.current = { ...analysisOutputsRef.current, ...newAnalysisOutputs };
+      setMessages(prev => prev.map(msg =>
+        msg.finalReportWithCitations
+          ? {
+              ...msg,
+              analysisOutputs: {
+                ...(msg.analysisOutputs || {}),
+                ...newAnalysisOutputs,
+              },
+            }
+          : msg
+      ));
+    }
 
     if (sourceCount > 0) {
       console.log('[SSE HANDLER] Updating websiteCount. Current sourceCount:', sourceCount);
@@ -278,8 +304,17 @@ export default function App() {
 
     if (agent === "report_composer_with_citations" && finalReportWithCitations) {
       const finalReportMessageId = Date.now().toString() + "_final";
-      setMessages(prev => [...prev, { type: "ai", content: finalReportWithCitations as string, id: finalReportMessageId, agent: currentAgentRef.current, finalReportWithCitations: true }]);
+      const snapshotOutputs = { ...analysisOutputsRef.current };
+      setMessages(prev => [...prev, {
+        type: "ai",
+        content: finalReportWithCitations as string,
+        id: finalReportMessageId,
+        agent: currentAgentRef.current,
+        finalReportWithCitations: true,
+        analysisOutputs: snapshotOutputs,
+      }]);
       setDisplayData(finalReportWithCitations as string);
+      analysisOutputsRef.current = {};
     }
   };
 
@@ -465,42 +500,39 @@ export default function App() {
     setDisplayData(null);
     setMessageEvents(new Map());
     setWebsiteCount(0);
+    analysisOutputsRef.current = {};
     window.location.reload();
   }, []);
 
   const BackendLoadingScreen = () => (
     <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden relative">
       <div className="w-full max-w-2xl z-10
-                      bg-neutral-900/50 backdrop-blur-md 
-                      p-8 rounded-2xl border border-neutral-700 
-                      shadow-2xl shadow-black/60">
-        
+                      bg-white p-8 rounded-2xl border border-gray-200
+                      shadow-lg shadow-gray-200/60">
         <div className="text-center space-y-6">
-          <h1 className="text-4xl font-bold text-white flex items-center justify-center gap-3">
-            ✨ Deep Search - ADK 🚀
+          <h1 className="text-4xl font-bold text-gray-900 flex items-center justify-center gap-3">
+            📈 AI 投资研究平台
           </h1>
-          
+
           <div className="flex flex-col items-center space-y-4">
-            {/* Spinning animation */}
             <div className="relative">
-              <div className="w-16 h-16 border-4 border-neutral-600 border-t-blue-500 rounded-full animate-spin"></div>
-              <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-r-purple-500 rounded-full animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
+              <div className="w-16 h-16 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-r-amber-400 rounded-full animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
             </div>
-            
+
             <div className="space-y-2">
-              <p className="text-xl text-neutral-300">
-                Waiting for backend to be ready...
+              <p className="text-xl text-gray-600">
+                正在连接后端服务...
               </p>
-              <p className="text-sm text-neutral-400">
-                This may take a moment on first startup
+              <p className="text-sm text-gray-400">
+                首次启动可能需要片刻，请稍候
               </p>
             </div>
-            
-            {/* Animated dots */}
+
             <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-              <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-              <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
             </div>
           </div>
         </div>
@@ -509,7 +541,7 @@ export default function App() {
   );
 
   return (
-    <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
+    <div className="flex h-screen bg-white text-gray-900 font-sans antialiased">
       <main className="flex-1 flex flex-col overflow-hidden w-full">
         <div className={`flex-1 overflow-y-auto ${(messages.length === 0 || isCheckingBackend) ? "flex" : ""}`}>
           {isCheckingBackend ? (
@@ -517,15 +549,15 @@ export default function App() {
           ) : !isBackendReady ? (
             <div className="flex-1 flex flex-col items-center justify-center p-4">
               <div className="text-center space-y-4">
-                <h2 className="text-2xl font-bold text-red-400">Backend Unavailable</h2>
-                <p className="text-neutral-300">
-                  Unable to connect to backend services at localhost:8000
+                <h2 className="text-2xl font-bold text-red-500">后端服务不可用</h2>
+                <p className="text-gray-500">
+                  无法连接到 localhost:8000，请检查后端是否已启动
                 </p>
-                <button 
-                  onClick={() => window.location.reload()} 
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
-                  Retry
+                  重试
                 </button>
               </div>
             </div>
