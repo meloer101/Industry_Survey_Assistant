@@ -12,6 +12,7 @@ from google.adk.events import Event, EventActions
 from google.adk.tools.agent_tool import AgentTool
 from google.genai import types as genai_types
 
+from .agents.analysis.coordinator import analysis_coordinator
 from .config import config
 from .tools.compare_statements import compare_fed_statements
 from .tools.fetch_transcript import fetch_fomc_transcript
@@ -270,6 +271,10 @@ report_composer = LlmAgent(
     *   Research Findings: `{section_research_findings}`
     *   Citation Sources: `{sources}`
     *   Report Structure: `{report_sections}`
+    *   Macro Analysis: `{macro_analysis_output?}`
+    *   Fundamental Analysis: `{fundamental_analysis_output?}`
+    *   Risk Analysis: `{risk_analysis_output?}`
+    *   Analysis Summary: `{analysis_summary?}`
 
     ---
     ### CRITICAL: Citation System
@@ -285,6 +290,14 @@ report_composer = LlmAgent(
     ### Final Instructions
     Generate a comprehensive report using ONLY the `<cite source="src-N" />` tag system for citations.
     Follow the structure in Report Structure exactly.
+    If analysis outputs are present, integrate them into the report. Follow the Report Structure as the primary skeleton.
+    If the structure does not contain an analysis chapter, append a "Financial Analysis & Risk Assessment" chapter before
+    the conclusion or as the final substantive chapter.
+    Use research [src-N] citation IDs where analysis references web-sourced claims. For data sourced from financial tools
+    such as yfinance, FRED, or Federal Reserve PDFs, preserve the inline source attribution already written by the analysis
+    agents and do not fabricate [src-N] IDs.
+    Always include the risk disclaimer from the risk analysis output at the end of the report when risk analysis is present.
+    If an analysis output is empty or missing, skip that subsection silently.
     Do not include a "References" or "Sources" section — all citations must be in-line.
     """,
     output_key="final_cited_report",
@@ -307,6 +320,7 @@ research_pipeline = SequentialAgent(
                 enhanced_search_executor,
             ],
         ),
+        analysis_coordinator,
         report_composer,
     ],
 )

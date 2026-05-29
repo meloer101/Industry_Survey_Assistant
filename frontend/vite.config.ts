@@ -30,6 +30,9 @@ export default defineConfig({
           });
           proxy.on('proxyReq', (proxyReq, req, _res) => {
             console.log('Sending Request to the Target:', req.method, proxyReq.path);
+            // ADK 2.x enforces origin allowlist; rewrite Origin so the proxy
+            // request looks same-origin to the backend.
+            proxyReq.setHeader('Origin', 'http://127.0.0.1:8000');
           });
           proxy.on('proxyRes', (proxyRes, req, _res) => {
             console.log('Received Response from the Target:', proxyRes.statusCode, req.url);

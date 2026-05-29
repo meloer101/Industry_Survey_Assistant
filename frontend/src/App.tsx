@@ -187,6 +187,14 @@ export default function App() {
         return "Quality Assessment";
       case "enhanced_search_executor":
         return "Enhanced Web Research";
+      case "analysis_coordinator":
+        return "Coordinating Financial Analysis";
+      case "macro_analysis_agent":
+        return "Macro Policy Analysis";
+      case "fundamental_analysis_agent":
+        return "Fundamental Analysis";
+      case "risk_analysis_agent":
+        return "Risk Assessment";
       case "research_pipeline":
         return "Executing Research Pipeline";
       case "iterative_refinement_loop":
@@ -197,6 +205,19 @@ export default function App() {
       default:
         return `Processing (${agentName || 'Unknown Agent'})`;
     }
+  };
+
+  const getFunctionTitle = (funcName: string, type: 'call' | 'response'): string => {
+    const friendlyNames: Record<string, string> = {
+      macro_analysis_agent: "Macro Policy Analysis",
+      fundamental_analysis_agent: "Fundamental Analysis",
+      risk_analysis_agent: "Risk Assessment",
+    };
+    const prefix = type === 'call' ? '▶' : '✓';
+    if (friendlyNames[funcName]) {
+      return `${prefix} ${friendlyNames[funcName]}`;
+    }
+    return `Function ${type === 'call' ? 'Call' : 'Response'}: ${funcName}`;
   };
 
   const processSseEventData = (jsonData: string, aiMessageId: string) => {
@@ -212,7 +233,7 @@ export default function App() {
     }
 
     if (functionCall) {
-      const functionCallTitle = `Function Call: ${functionCall.name}`;
+      const functionCallTitle = getFunctionTitle(functionCall.name, 'call');
       console.log('[SSE HANDLER] Adding Function Call timeline event:', functionCallTitle);
       setMessageEvents(prev => new Map(prev).set(aiMessageId, [...(prev.get(aiMessageId) || []), {
         title: functionCallTitle,
@@ -221,7 +242,7 @@ export default function App() {
     }
 
     if (functionResponse) {
-      const functionResponseTitle = `Function Response: ${functionResponse.name}`;
+      const functionResponseTitle = getFunctionTitle(functionResponse.name, 'response');
       console.log('[SSE HANDLER] Adding Function Response timeline event:', functionResponseTitle);
       setMessageEvents(prev => new Map(prev).set(aiMessageId, [...(prev.get(aiMessageId) || []), {
         title: functionResponseTitle,
