@@ -3,129 +3,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Copy, CopyCheck } from "lucide-react";
 import { InputForm } from "@/components/InputForm";
 import { Button } from "@/components/ui/button";
-import { useState, ReactNode } from "react";
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from 'remark-gfm';
-import { cn } from "@/utils";
-import { Badge } from "@/components/ui/badge";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
-import { AnalysisPanel, type AnalysisOutputs } from "@/components/AnalysisPanel";
-
-type MdComponentProps = {
-  className?: string;
-  children?: ReactNode;
-  [key: string]: any;
-};
-
-interface ProcessedEvent {
-  title: string;
-  data: any;
-}
-
-const mdComponents = {
-  h1: ({ className, children, ...props }: MdComponentProps) => (
-    <h1 className={cn("text-2xl font-bold mt-4 mb-2 text-gray-900", className)} {...props}>
-      {children}
-    </h1>
-  ),
-  h2: ({ className, children, ...props }: MdComponentProps) => (
-    <h2 className={cn("text-xl font-bold mt-3 mb-2 text-gray-900", className)} {...props}>
-      {children}
-    </h2>
-  ),
-  h3: ({ className, children, ...props }: MdComponentProps) => (
-    <h3 className={cn("text-lg font-bold mt-3 mb-1 text-gray-800", className)} {...props}>
-      {children}
-    </h3>
-  ),
-  p: ({ className, children, ...props }: MdComponentProps) => (
-    <p className={cn("mb-3 leading-7 text-gray-700", className)} {...props}>
-      {children}
-    </p>
-  ),
-  a: ({ className, children, href, ...props }: MdComponentProps) => (
-    <Badge className="text-xs mx-0.5 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100">
-      <a
-        className={cn("text-blue-600 hover:text-blue-700 text-xs", className)}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        {...props}
-      >
-        {children}
-      </a>
-    </Badge>
-  ),
-  ul: ({ className, children, ...props }: MdComponentProps) => (
-    <ul className={cn("list-disc pl-6 mb-3 text-gray-700", className)} {...props}>
-      {children}
-    </ul>
-  ),
-  ol: ({ className, children, ...props }: MdComponentProps) => (
-    <ol className={cn("list-decimal pl-6 mb-3 text-gray-700", className)} {...props}>
-      {children}
-    </ol>
-  ),
-  li: ({ className, children, ...props }: MdComponentProps) => (
-    <li className={cn("mb-1", className)} {...props}>
-      {children}
-    </li>
-  ),
-  blockquote: ({ className, children, ...props }: MdComponentProps) => (
-    <blockquote
-      className={cn("border-l-4 border-gray-300 pl-4 italic my-3 text-sm text-gray-500", className)}
-      {...props}
-    >
-      {children}
-    </blockquote>
-  ),
-  code: ({ className, children, ...props }: MdComponentProps) => (
-    <code
-      className={cn("bg-gray-100 rounded px-1 py-0.5 font-mono text-xs text-gray-800", className)}
-      {...props}
-    >
-      {children}
-    </code>
-  ),
-  pre: ({ className, children, ...props }: MdComponentProps) => (
-    <pre
-      className={cn("bg-gray-100 p-3 rounded-lg overflow-x-auto font-mono text-xs my-3 text-gray-800", className)}
-      {...props}
-    >
-      {children}
-    </pre>
-  ),
-  hr: ({ className, ...props }: MdComponentProps) => (
-    <hr className={cn("border-gray-200 my-4", className)} {...props} />
-  ),
-  table: ({ className, children, ...props }: MdComponentProps) => (
-    <div className="my-3 overflow-x-auto">
-      <table className={cn("border-collapse w-full", className)} {...props}>
-        {children}
-      </table>
-    </div>
-  ),
-  th: ({ className, children, ...props }: MdComponentProps) => (
-    <th
-      className={cn("border border-gray-200 px-3 py-2 text-left font-bold bg-gray-50 text-gray-700", className)}
-      {...props}
-    >
-      {children}
-    </th>
-  ),
-  td: ({ className, children, ...props }: MdComponentProps) => (
-    <td className={cn("border border-gray-200 px-3 py-2 text-gray-700", className)} {...props}>
-      {children}
-    </td>
-  ),
-};
+import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { mdComponents } from "@/lib/markdown";
+import type { ProcessedEvent, MessageWithAgent, AnalysisOutputs } from "@/types";
 
 interface HumanMessageBubbleProps {
   message: { content: string; id: string };
-  mdComponents: typeof mdComponents;
 }
 
-const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({ message, mdComponents }) => {
+const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({ message }) => {
   return (
     <div className="text-gray-900 rounded-2xl break-words min-h-7 bg-gray-100 max-w-[85%] sm:max-w-[80%] px-4 pt-3 pb-2 rounded-br-sm">
       <ReactMarkdown components={mdComponents} remarkPlugins={[remarkGfm]}>
@@ -137,7 +27,6 @@ const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({ message, mdComp
 
 interface AiMessageBubbleProps {
   message: { content: string; id: string };
-  mdComponents: typeof mdComponents;
   handleCopy: (text: string, messageId: string) => void;
   copiedMessageId: string | null;
   agent?: string;
@@ -150,7 +39,6 @@ interface AiMessageBubbleProps {
 
 const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
   message,
-  mdComponents,
   handleCopy,
   copiedMessageId,
   agent,
@@ -259,7 +147,7 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
 };
 
 interface ChatMessagesViewProps {
-  messages: { type: "human" | "ai"; content: string; id: string; agent?: string; finalReportWithCitations?: boolean; analysisOutputs?: AnalysisOutputs }[];
+  messages: MessageWithAgent[];
   isLoading: boolean;
   scrollAreaRef: React.RefObject<HTMLDivElement | null>;
   onSubmit: (query: string) => void;
@@ -330,11 +218,10 @@ export function ChatMessagesView({
                   className={`flex ${message.type === "human" ? "justify-end" : "justify-start"}`}
                 >
                   {message.type === "human" ? (
-                    <HumanMessageBubble message={message} mdComponents={mdComponents} />
+                    <HumanMessageBubble message={message} />
                   ) : (
                     <AiMessageBubble
                       message={message}
-                      mdComponents={mdComponents}
                       handleCopy={handleCopy}
                       copiedMessageId={copiedMessageId}
                       agent={message.agent}

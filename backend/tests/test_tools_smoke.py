@@ -1,9 +1,12 @@
+import pytest
 from unittest.mock import MagicMock
 
 from app.tools.compare_statements import compare_fed_statements
 from app.tools.fetch_transcript import fetch_fomc_transcript
 from app.tools.market_data import get_price_history, get_ticker_overview
 from app.tools.rate_probability import get_rate_move_probability
+
+pytestmark = pytest.mark.network
 
 
 def test_market_data_overview():

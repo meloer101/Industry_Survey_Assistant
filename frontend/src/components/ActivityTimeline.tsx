@@ -23,11 +23,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
-
-export interface ProcessedEvent {
-  title: string;
-  data: any;
-}
+import type { ProcessedEvent, SseEventData } from "@/types";
 
 interface ActivityTimelineProps {
   processedEvents: ProcessedEvent[];
@@ -81,54 +77,25 @@ export function ActivityTimeline({
 }: ActivityTimelineProps) {
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(false);
 
-  const formatEventData = (data: any): string => {
-    if (typeof data === "object" && data !== null && data.type) {
-      switch (data.type) {
-        case 'functionCall':
-          return `Calling function: ${data.name}\nArguments: ${JSON.stringify(data.args, null, 2)}`;
-        case 'functionResponse':
-          return `Function ${data.name} response:\n${JSON.stringify(data.response, null, 2)}`;
-        case 'text':
-          return data.content;
-        case 'sources': {
-          const sources = data.content as Record<string, { title: string; url: string }>;
-          if (Object.keys(sources).length === 0) return "No sources found.";
-          return Object.values(sources)
-            .map(source => `[${source.title || 'Untitled Source'}](${source.url})`).join(', ');
-        }
-        default:
-          return JSON.stringify(data, null, 2);
+  const formatEventData = (data: SseEventData): string => {
+    switch (data.type) {
+      case 'functionCall':
+        return `Calling function: ${data.name}\nArguments: ${JSON.stringify(data.args, null, 2)}`;
+      case 'functionResponse':
+        return `Function ${data.name} response:\n${JSON.stringify(data.response, null, 2)}`;
+      case 'text':
+        return data.content;
+      case 'sources': {
+        const sources = data.content;
+        if (Object.keys(sources).length === 0) return "No sources found.";
+        return Object.values(sources)
+          .map(source => `[${source.title || 'Untitled Source'}](${source.url})`).join(', ');
       }
     }
-    if (typeof data === "string") {
-      try {
-        const parsed = JSON.parse(data);
-        return JSON.stringify(parsed, null, 2);
-      } catch {
-        return data;
-      }
-    } else if (Array.isArray(data)) {
-      return data.join(", ");
-    } else if (typeof data === "object" && data !== null) {
-      return JSON.stringify(data, null, 2);
-    }
-    return String(data);
   };
 
-  const isJsonData = (data: any): boolean => {
-    if (typeof data === "object" && data !== null && data.type) {
-      if (data.type === 'sources') return false;
-      return data.type === 'functionCall' || data.type === 'functionResponse';
-    }
-    if (typeof data === "string") {
-      try {
-        JSON.parse(data);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    return typeof data === "object" && data !== null;
+  const isJsonData = (data: SseEventData): boolean => {
+    return data.type === 'functionCall' || data.type === 'functionResponse';
   };
 
   const getEventIcon = (title: string) => {

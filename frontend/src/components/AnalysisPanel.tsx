@@ -1,60 +1,7 @@
-import { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/utils";
-
-type MdComponentProps = {
-  className?: string;
-  children?: ReactNode;
-  [key: string]: any;
-};
-
-const mdComponents = {
-  h1: ({ className, children, ...props }: MdComponentProps) => (
-    <h1 className={cn("text-xl font-bold mt-4 mb-2 text-gray-900", className)} {...props}>{children}</h1>
-  ),
-  h2: ({ className, children, ...props }: MdComponentProps) => (
-    <h2 className={cn("text-lg font-bold mt-3 mb-2 text-gray-900", className)} {...props}>{children}</h2>
-  ),
-  h3: ({ className, children, ...props }: MdComponentProps) => (
-    <h3 className={cn("text-base font-semibold mt-3 mb-1 text-gray-800", className)} {...props}>{children}</h3>
-  ),
-  p: ({ className, children, ...props }: MdComponentProps) => (
-    <p className={cn("mb-3 leading-7 text-sm text-gray-700", className)} {...props}>{children}</p>
-  ),
-  a: ({ className, children, href, ...props }: MdComponentProps) => (
-    <Badge className="text-xs mx-0.5 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100">
-      <a
-        className={cn("text-blue-600 hover:text-blue-700 text-xs", className)}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        {...props}
-      >
-        {children}
-      </a>
-    </Badge>
-  ),
-  ul: ({ className, children, ...props }: MdComponentProps) => (
-    <ul className={cn("list-disc pl-5 mb-3 text-sm text-gray-700", className)} {...props}>{children}</ul>
-  ),
-  ol: ({ className, children, ...props }: MdComponentProps) => (
-    <ol className={cn("list-decimal pl-5 mb-3 text-sm text-gray-700", className)} {...props}>{children}</ol>
-  ),
-  li: ({ className, children, ...props }: MdComponentProps) => (
-    <li className={cn("mb-1", className)} {...props}>{children}</li>
-  ),
-  blockquote: ({ className, children, ...props }: MdComponentProps) => (
-    <blockquote className={cn("border-l-4 border-gray-300 pl-4 italic my-3 text-sm text-gray-500", className)} {...props}>
-      {children}
-    </blockquote>
-  ),
-  hr: ({ className, ...props }: MdComponentProps) => (
-    <hr className={cn("border-gray-200 my-3", className)} {...props} />
-  ),
-};
+import { analysisMdComponents } from "@/lib/markdown";
 
 export interface AnalysisOutputs {
   macro?: string;
@@ -70,7 +17,7 @@ interface AnalysisPanelProps {
 function MarkdownContent({ content }: { content: string }) {
   return (
     <div className="prose max-w-none text-gray-700">
-      <ReactMarkdown components={mdComponents} remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown components={analysisMdComponents} remarkPlugins={[remarkGfm]}>
         {content}
       </ReactMarkdown>
     </div>

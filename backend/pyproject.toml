@@ -24,6 +24,9 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = "."
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "network: tests that require external network access (deselect with -m 'not network')",
+]
 
 [build-system]
 requires = ["hatchling"]
