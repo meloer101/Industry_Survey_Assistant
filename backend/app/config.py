@@ -17,10 +17,14 @@ class ResearchConfiguration:
     """Configuration for research-related models and parameters."""
 
     worker_model: LiteLlm = field(
-        default_factory=lambda: LiteLlm(model="deepseek/deepseek-v4-flash")
+        default_factory=lambda: LiteLlm(
+            model=os.environ.get("WORKER_MODEL", "deepseek/deepseek-v4-flash")
+        )
     )
     critic_model: LiteLlm = field(
-        default_factory=lambda: LiteLlm(model="deepseek/deepseek-v4-pro")
+        default_factory=lambda: LiteLlm(
+            model=os.environ.get("CRITIC_MODEL", "deepseek/deepseek-v4-pro")
+        )
     )
     max_search_iterations: int = field(
         default_factory=lambda: int(os.environ.get("MAX_SEARCH_ITERATIONS", "3"))

@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/app/.env
+    environment:
+      LOG_FORMAT: json
+    volumes:
+      - session-data:/app/app/.adk
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_KEY: ${VITE_API_KEY:-dev-local-key-change-in-production}
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  session-data:

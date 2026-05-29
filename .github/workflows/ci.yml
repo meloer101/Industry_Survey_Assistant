@@ -34,6 +34,9 @@ jobs:
       - run: uv run python -m py_compile app/main.py
       - run: uv run python -m py_compile app/agent.py
       - run: uv run python -m py_compile app/callbacks.py
+      - run: uv run python -m py_compile app/agents/custom.py
+      - run: uv run python -m py_compile app/agents/research/pipeline.py
+      - run: uv run python -m py_compile app/agents/research/prompts.py
 
   frontend-check:
     runs-on: ubuntu-latest

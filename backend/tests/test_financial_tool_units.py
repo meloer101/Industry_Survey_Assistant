@@ -1,6 +1,10 @@
+import asyncio
 import time
 
-from app.agent import PipelineGuard
+import pytest
+from google.adk.agents import BaseAgent
+
+from app.agents.custom import PipelineGuard
 from app.tools import market_data
 from app.tools.fetch_transcript import _candidate_urls
 from app.tools.rate_probability import _extract_probabilities
@@ -86,3 +90,39 @@ def test_max_search_iterations_reads_environment(monkeypatch):
     test_config = ResearchConfiguration()
 
     assert test_config.max_search_iterations == 1
+
+
+def test_model_names_read_environment(monkeypatch):
+    monkeypatch.setenv("WORKER_MODEL", "deepseek/test-worker")
+    monkeypatch.setenv("CRITIC_MODEL", "deepseek/test-critic")
+
+    test_config = ResearchConfiguration()
+
+    assert test_config.worker_model.model == "deepseek/test-worker"
+    assert test_config.critic_model.model == "deepseek/test-critic"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_guard_emits_partial_report_on_cancelled_pipeline():
+    class CancelledPipeline(BaseAgent):
+        def __init__(self):
+            super().__init__(name="cancelled_pipeline")
+
+        async def _run_async_impl(self, ctx):
+            raise asyncio.CancelledError
+            yield
+
+    class FakeSession:
+        state = {"section_research_findings": "Partial findings"}
+
+    class FakeContext:
+        session = FakeSession()
+
+    guard = PipelineGuard(CancelledPipeline())
+
+    events = [event async for event in guard._run_async_impl(FakeContext())]
+
+    assert len(events) == 1
+    assert events[0].actions.state_delta["final_report_with_citations"].startswith(
+        "# Research interrupted"
+    )

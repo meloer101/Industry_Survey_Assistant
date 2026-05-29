@@ -1,4 +1,4 @@
-"""Unit tests for callback pure functions in agent.py.
+"""Unit tests for callback pure functions in callbacks.py.
 
 parse_evaluation_callback operates on state["research_evaluation"].
 citation_replacement_callback operates on state["final_cited_report"] + state["sources"],
@@ -7,7 +7,7 @@ writes to state["final_report_with_citations"], and returns a genai Content.
 
 import json
 
-from app.agent import (
+from app.callbacks import (
     parse_evaluation_callback,
     citation_replacement_callback,
 )

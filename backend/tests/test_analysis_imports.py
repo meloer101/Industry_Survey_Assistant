@@ -15,8 +15,8 @@ def test_analysis_agents_import_cleanly():
 
 def test_optional_keys_in_analysis_prompts():
     """Skipped analysis outputs should not cause ADK state-injection KeyError."""
-    from app.agent import report_composer
     from app.agents.analysis.risk_agent import RISK_ANALYSIS_PROMPT
+    from app.agents.research.pipeline import report_composer
 
     assert "{macro_analysis_output?}" in RISK_ANALYSIS_PROMPT
     assert "{fundamental_analysis_output?}" in RISK_ANALYSIS_PROMPT
@@ -27,7 +27,7 @@ def test_optional_keys_in_analysis_prompts():
 
 
 def test_pipeline_includes_analysis_coordinator_before_report_composer():
-    from app.agent import research_pipeline
+    from app.agents.research.pipeline import research_pipeline
 
     agent_names = [agent.name for agent in research_pipeline.sub_agents]
 
