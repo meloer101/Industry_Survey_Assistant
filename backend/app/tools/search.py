@@ -1,7 +1,11 @@
 import os
+import logging
 
 from google.adk.tools import ToolContext
 from tavily import TavilyClient
+
+
+logger = logging.getLogger(__name__)
 
 
 def tavily_search(query: str, tool_context: ToolContext) -> str:
@@ -14,8 +18,17 @@ def tavily_search(query: str, tool_context: ToolContext) -> str:
     Returns:
         Formatted search results, each prefixed with a [src-N] citation ID.
     """
-    client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
-    response = client.search(query, search_depth="basic", max_results=5)
+    api_key = os.environ.get("TAVILY_API_KEY")
+    if not api_key:
+        logger.warning("Tavily search skipped because TAVILY_API_KEY is not configured.")
+        return "Search unavailable: TAVILY_API_KEY is not configured."
+
+    try:
+        client = TavilyClient(api_key=api_key)
+        response = client.search(query, search_depth="basic", max_results=5)
+    except Exception:
+        logger.warning("Tavily search failed for query: %s", query, exc_info=True)
+        return "Search unavailable: Tavily request failed. Try again later."
 
     url_to_short_id: dict = tool_context.state.get("url_to_short_id", {})
     sources: dict = tool_context.state.get("sources", {})

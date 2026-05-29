@@ -4,6 +4,7 @@ from datetime import datetime
 import csv
 import io
 import json
+import logging
 import os
 import re
 from typing import Any
@@ -15,6 +16,7 @@ from tavily import TavilyClient
 
 FRED_FEDFUNDS_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=FEDFUNDS"
 REQUEST_TIMEOUT = 20
+logger = logging.getLogger(__name__)
 
 
 def _target_range_from_effective_rate(rate: float) -> str:
@@ -150,6 +152,7 @@ def get_rate_move_probability(meeting_date: str, tool_context: ToolContext) -> s
                 f"{observation_date}: {effective_rate:.2f}%."
             )
     except Exception as exc:
+        logger.warning("FRED FEDFUNDS fetch failed", exc_info=True)
         fred_note = f"FRED FEDFUNDS fetch failed: {exc}"
 
     try:
@@ -166,6 +169,7 @@ def get_rate_move_probability(meeting_date: str, tool_context: ToolContext) -> s
                     {"search_excerpt": snippet},
                 )
     except Exception as exc:
+        logger.warning("Tavily rate probability lookup failed", exc_info=True)
         fred_note += f" Tavily fallback failed: {exc}"
 
     return _payload(

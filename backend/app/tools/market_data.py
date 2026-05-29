@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from google.adk.tools import ToolContext
 import yfinance as yf
 
 
+logger = logging.getLogger(__name__)
 VALID_PERIODS = {"5d", "1mo", "3mo", "6mo", "1y"}
 
 
@@ -52,6 +54,7 @@ def get_ticker_overview(ticker: str, tool_context: ToolContext) -> str:
         stock = yf.Ticker(symbol)
         info = stock.info or {}
     except Exception:
+        logger.warning("Could not fetch ticker overview for %s", symbol, exc_info=True)
         return f"No data found for ticker: {symbol}"
 
     quote_type = info.get("quoteType")
@@ -94,6 +97,7 @@ def get_price_history(ticker: str, period: str, tool_context: ToolContext) -> st
     try:
         history = yf.download(symbol, period=normalized_period, auto_adjust=True, progress=False)
     except Exception as exc:
+        logger.warning("Could not fetch price history for %s", symbol, exc_info=True)
         return f"Could not fetch price history for {symbol}: {exc}"
 
     if history.empty:

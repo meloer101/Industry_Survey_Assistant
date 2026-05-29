@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 import difflib
+import logging
 import re
 
 from google.adk.tools import ToolContext
@@ -12,6 +13,7 @@ import requests
 MAX_PDF_BYTES = 5 * 1024 * 1024
 MAX_DIFF_LINES = 200
 REQUEST_TIMEOUT = 30
+logger = logging.getLogger(__name__)
 
 
 def _download_pdf(url: str) -> bytes | str:
@@ -67,8 +69,10 @@ def compare_fed_statements(url1: str, url2: str, tool_context: ToolContext) -> s
         if second_text.startswith("Could not extract text"):
             return second_text
     except requests.Timeout:
+        logger.warning("Timeout downloading FOMC statement PDFs", exc_info=True)
         return "Timeout downloading FOMC statement PDFs. Try again later."
     except Exception as exc:
+        logger.warning("Error comparing Fed statements", exc_info=True)
         return f"Error comparing Fed statements: {exc}"
 
     diff_lines = list(
