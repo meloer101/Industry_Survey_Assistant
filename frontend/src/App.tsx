@@ -2,7 +2,14 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { v4 as uuidv4 } from 'uuid';
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatMessagesView } from "@/components/ChatMessagesView";
+import { HistoryPanel } from "@/components/HistoryPanel";
 import type { AnalysisOutputs } from "@/components/AnalysisPanel";
+
+const API_KEY = import.meta.env.VITE_API_KEY ?? "";
+const authHeaders = (): Record<string, string> =>
+  API_KEY ? { "X-API-Key": API_KEY } : {};
+const requestHeaders = authHeaders();
+const USER_ID_STORAGE_KEY = "investmentResearchUserId";
 
 // Update DisplayData to be a string type
 type DisplayData = string | null;
@@ -21,7 +28,7 @@ interface ProcessedEvent {
 }
 
 export default function App() {
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(() => localStorage.getItem(USER_ID_STORAGE_KEY));
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [appName, setAppName] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageWithAgent[]>([]);
@@ -31,10 +38,12 @@ export default function App() {
   const [websiteCount, setWebsiteCount] = useState<number>(0);
   const [isBackendReady, setIsBackendReady] = useState(false);
   const [isCheckingBackend, setIsCheckingBackend] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const currentAgentRef = useRef('');
   const accumulatedTextRef = useRef("");
   const analysisOutputsRef = useRef<AnalysisOutputs>({});
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const retryWithBackoff = async (
     fn: () => Promise<any>,
@@ -52,9 +61,12 @@ export default function App() {
       try {
         return await fn();
       } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw error;
+        }
         lastError = error as Error;
         const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff, max 5s
-        console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`, error);
+        console.warn(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`, error);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -62,14 +74,16 @@ export default function App() {
     throw lastError!;
   };
 
-  const createSession = async (): Promise<{userId: string, sessionId: string, appName: string}> => {
-    const generatedUserId = `u_${uuidv4()}`;
+  const createSession = async (signal?: AbortSignal, existingUserId?: string | null): Promise<{userId: string, sessionId: string, appName: string}> => {
+    const generatedUserId = existingUserId ?? `u_${uuidv4()}`;
     const generatedSessionId = uuidv4();
     const response = await fetch(`/api/apps/app/users/${generatedUserId}/sessions/${generatedSessionId}`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
-      }
+        "Content-Type": "application/json",
+        ...requestHeaders,
+      },
+      signal,
     });
     
     if (!response.ok) {
@@ -86,16 +100,15 @@ export default function App() {
 
   const checkBackendHealth = async (): Promise<boolean> => {
     try {
-      // Use the docs endpoint or root endpoint to check if backend is ready
-      const response = await fetch("/api/docs", {
+      const response = await fetch("/api/health", {
         method: "GET",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...requestHeaders,
         }
       });
       return response.ok;
-    } catch (error) {
-      console.log("Backend not ready yet:", error);
+    } catch {
       return false;
     }
   };
@@ -104,7 +117,6 @@ export default function App() {
   const extractDataFromSSE = (data: string) => {
     try {
       const parsed = JSON.parse(data);
-      console.log('[SSE PARSED EVENT]:', JSON.stringify(parsed, null, 2)); // DEBUG: Log parsed event
 
       let textParts: string[] = [];
       let agent = '';
@@ -135,7 +147,6 @@ export default function App() {
       // Extract agent information
       if (parsed.author) {
         agent = parsed.author;
-        console.log('[SSE EXTRACT] Agent:', agent); // DEBUG: Log agent
       }
 
       if (
@@ -149,20 +160,14 @@ export default function App() {
       // Extract website count from research agents
       let sourceCount = 0;
       if ((parsed.author === 'section_researcher' || parsed.author === 'enhanced_search_executor')) {
-        console.log('[SSE EXTRACT] Relevant agent for source count:', parsed.author); // DEBUG
         if (parsed.actions?.stateDelta?.url_to_short_id) {
-          console.log('[SSE EXTRACT] url_to_short_id found:', parsed.actions.stateDelta.url_to_short_id); // DEBUG
           sourceCount = Object.keys(parsed.actions.stateDelta.url_to_short_id).length;
-          console.log('[SSE EXTRACT] Calculated sourceCount:', sourceCount); // DEBUG
-        } else {
-          console.log('[SSE EXTRACT] url_to_short_id NOT found for agent:', parsed.author); // DEBUG
         }
       }
 
       // Extract sources if available
       if (parsed.actions?.stateDelta?.sources) {
         sources = parsed.actions.stateDelta.sources;
-        console.log('[SSE EXTRACT] Sources found:', sources); // DEBUG
       }
 
       // Extract analysis agent outputs from stateDelta
@@ -250,7 +255,6 @@ export default function App() {
     }
 
     if (sourceCount > 0) {
-      console.log('[SSE HANDLER] Updating websiteCount. Current sourceCount:', sourceCount);
       setWebsiteCount(prev => Math.max(prev, sourceCount));
     }
 
@@ -260,7 +264,6 @@ export default function App() {
 
     if (functionCall) {
       const functionCallTitle = getFunctionTitle(functionCall.name, 'call');
-      console.log('[SSE HANDLER] Adding Function Call timeline event:', functionCallTitle);
       setMessageEvents(prev => new Map(prev).set(aiMessageId, [...(prev.get(aiMessageId) || []), {
         title: functionCallTitle,
         data: { type: 'functionCall', name: functionCall.name, args: functionCall.args, id: functionCall.id }
@@ -269,7 +272,6 @@ export default function App() {
 
     if (functionResponse) {
       const functionResponseTitle = getFunctionTitle(functionResponse.name, 'response');
-      console.log('[SSE HANDLER] Adding Function Response timeline event:', functionResponseTitle);
       setMessageEvents(prev => new Map(prev).set(aiMessageId, [...(prev.get(aiMessageId) || []), {
         title: functionResponseTitle,
         data: { type: 'functionResponse', name: functionResponse.name, response: functionResponse.response, id: functionResponse.id }
@@ -279,7 +281,6 @@ export default function App() {
     if (textParts.length > 0 && agent !== "report_composer_with_citations") {
       if (agent !== "interactive_planner_agent") {
         const eventTitle = getEventTitle(agent);
-        console.log('[SSE HANDLER] Adding Text timeline event for agent:', agent, 'Title:', eventTitle, 'Data:', textParts.join(" "));
         setMessageEvents(prev => new Map(prev).set(aiMessageId, [...(prev.get(aiMessageId) || []), {
           title: eventTitle,
           data: { type: 'text', content: textParts.join(" ") }
@@ -296,7 +297,6 @@ export default function App() {
     }
 
     if (sources) {
-      console.log('[SSE HANDLER] Adding Retrieved Sources timeline event:', sources);
       setMessageEvents(prev => new Map(prev).set(aiMessageId, [...(prev.get(aiMessageId) || []), {
         title: "Retrieved Sources", data: { type: 'sources', content: sources }
       }]));
@@ -322,6 +322,10 @@ export default function App() {
     if (!query.trim()) return;
 
     setIsLoading(true);
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    const abortSignal = abortControllerRef.current.signal;
+
     try {
       // Create session if it doesn't exist
       let currentUserId = userId;
@@ -329,16 +333,18 @@ export default function App() {
       let currentAppName = appName;
       
       if (!currentSessionId || !currentUserId || !currentAppName) {
-        console.log('Creating new session...');
-        const sessionData = await retryWithBackoff(createSession);
-        currentUserId = sessionData.userId;
-        currentSessionId = sessionData.sessionId;
-        currentAppName = sessionData.appName;
+        const sessionData = await retryWithBackoff(() => createSession(abortSignal, currentUserId));
+        const resolvedUserId = sessionData.userId;
+        const resolvedSessionId = sessionData.sessionId;
+        const resolvedAppName = sessionData.appName;
+        currentUserId = resolvedUserId;
+        currentSessionId = resolvedSessionId;
+        currentAppName = resolvedAppName;
         
-        setUserId(currentUserId);
-        setSessionId(currentSessionId);
-        setAppName(currentAppName);
-        console.log('Session created successfully:', { currentUserId, currentSessionId, currentAppName });
+        setUserId(resolvedUserId);
+        setSessionId(resolvedSessionId);
+        setAppName(resolvedAppName);
+        localStorage.setItem(USER_ID_STORAGE_KEY, resolvedUserId);
       }
 
       // Add user message to chat
@@ -363,7 +369,9 @@ export default function App() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...requestHeaders,
           },
+          signal: abortSignal,
           body: JSON.stringify({
             appName: currentAppName,
             userId: currentUserId,
@@ -392,58 +400,68 @@ export default function App() {
       let eventDataBuffer = "";
 
       if (reader) {
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          const { done, value } = await reader.read();
+        try {
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const { done, value } = await reader.read();
 
-          if (value) {
-            lineBuffer += decoder.decode(value, { stream: true });
-          }
+            if (value) {
+              lineBuffer += decoder.decode(value, { stream: true });
+            }
           
-          let eolIndex;
-          // Process all complete lines in the buffer, or the remaining buffer if 'done'
-          while ((eolIndex = lineBuffer.indexOf('\n')) >= 0 || (done && lineBuffer.length > 0)) {
-            let line: string;
-            if (eolIndex >= 0) {
-              line = lineBuffer.substring(0, eolIndex);
-              lineBuffer = lineBuffer.substring(eolIndex + 1);
-            } else { // Only if done and lineBuffer has content without a trailing newline
-              line = lineBuffer;
-              lineBuffer = "";
-            }
-
-            if (line.trim() === "") { // Empty line: dispatch event
-              if (eventDataBuffer.length > 0) {
-                // Remove trailing newline before parsing
-                const jsonDataToParse = eventDataBuffer.endsWith('\n') ? eventDataBuffer.slice(0, -1) : eventDataBuffer;
-                console.log('[SSE DISPATCH EVENT]:', jsonDataToParse.substring(0, 200) + "..."); // DEBUG
-                processSseEventData(jsonDataToParse, aiMessageId);
-                eventDataBuffer = ""; // Reset for next event
+            let eolIndex;
+            // Process all complete lines in the buffer, or the remaining buffer if 'done'
+            while ((eolIndex = lineBuffer.indexOf('\n')) >= 0 || (done && lineBuffer.length > 0)) {
+              let line: string;
+              if (eolIndex >= 0) {
+                line = lineBuffer.substring(0, eolIndex);
+                lineBuffer = lineBuffer.substring(eolIndex + 1);
+              } else { // Only if done and lineBuffer has content without a trailing newline
+                line = lineBuffer;
+                lineBuffer = "";
               }
-            } else if (line.startsWith('data:')) {
-              eventDataBuffer += line.substring(5).trimStart() + '\n'; // Add newline as per spec for multi-line data
-            } else if (line.startsWith(':')) {
-              // Comment line, ignore
-            } // Other SSE fields (event, id, retry) can be handled here if needed
-          }
 
-          if (done) {
-            // If the loop exited due to 'done', and there's still data in eventDataBuffer
-            // (e.g., stream ended after data lines but before an empty line delimiter)
-            if (eventDataBuffer.length > 0) {
-              const jsonDataToParse = eventDataBuffer.endsWith('\n') ? eventDataBuffer.slice(0, -1) : eventDataBuffer;
-              console.log('[SSE DISPATCH FINAL EVENT]:', jsonDataToParse.substring(0,200) + "..."); // DEBUG
-              processSseEventData(jsonDataToParse, aiMessageId);
-              eventDataBuffer = ""; // Clear buffer
+              if (line.trim() === "") { // Empty line: dispatch event
+                if (eventDataBuffer.length > 0) {
+                  // Remove trailing newline before parsing
+                  const jsonDataToParse = eventDataBuffer.endsWith('\n') ? eventDataBuffer.slice(0, -1) : eventDataBuffer;
+                  processSseEventData(jsonDataToParse, aiMessageId);
+                  eventDataBuffer = ""; // Reset for next event
+                }
+              } else if (line.startsWith('data:')) {
+                eventDataBuffer += line.substring(5).trimStart() + '\n'; // Add newline as per spec for multi-line data
+              } else if (line.startsWith(':')) {
+                // Comment line, ignore
+              } // Other SSE fields (event, id, retry) can be handled here if needed
             }
-            break; // Exit the while(true) loop
+
+            if (done) {
+              // If the loop exited due to 'done', and there's still data in eventDataBuffer
+              // (e.g., stream ended after data lines but before an empty line delimiter)
+              if (eventDataBuffer.length > 0) {
+                const jsonDataToParse = eventDataBuffer.endsWith('\n') ? eventDataBuffer.slice(0, -1) : eventDataBuffer;
+                processSseEventData(jsonDataToParse, aiMessageId);
+                eventDataBuffer = ""; // Clear buffer
+              }
+              break; // Exit the while(true) loop
+            }
           }
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            throw error;
+          }
+          throw error;
         }
       }
 
       setIsLoading(false);
+      abortControllerRef.current = null;
 
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setIsLoading(false);
+        return;
+      }
       console.error("Error:", error);
       // Update the AI message placeholder with an error message
       const aiMessageId = Date.now().toString() + "_ai_error";
@@ -453,6 +471,7 @@ export default function App() {
         id: aiMessageId 
       }]);
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   }, [processSseEventData]);
 
@@ -496,12 +515,25 @@ export default function App() {
   }, []);
 
   const handleCancel = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     setMessages([]);
     setDisplayData(null);
     setMessageEvents(new Map());
     setWebsiteCount(0);
+    setIsLoading(false);
     analysisOutputsRef.current = {};
-    window.location.reload();
+  }, []);
+
+  const handleSelectHistorySession = useCallback((selectedSessionId: string) => {
+    setSessionId(selectedSessionId);
+    setAppName("app");
+    setMessages(prev => [...prev, {
+      type: "ai",
+      content: `已选择历史会话 ${selectedSessionId}。你可以继续提问；完整历史报告加载将在后续版本支持。`,
+      id: `${Date.now()}_history`,
+      agent: "history",
+    }]);
   }, []);
 
   const BackendLoadingScreen = () => (
@@ -542,6 +574,13 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-white text-gray-900 font-sans antialiased">
+      <HistoryPanel
+        userId={userId}
+        isOpen={isHistoryOpen}
+        requestHeaders={requestHeaders}
+        onToggle={() => setIsHistoryOpen(prev => !prev)}
+        onSelectSession={handleSelectHistorySession}
+      />
       <main className="flex-1 flex flex-col overflow-hidden w-full">
         <div className={`flex-1 overflow-y-auto ${(messages.length === 0 || isCheckingBackend) ? "flex" : ""}`}>
           {isCheckingBackend ? (

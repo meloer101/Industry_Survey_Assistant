@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import concurrent.futures
 from typing import Any
 
 from google.adk.tools import ToolContext
@@ -9,6 +10,7 @@ import yfinance as yf
 
 logger = logging.getLogger(__name__)
 VALID_PERIODS = {"5d", "1mo", "3mo", "6mo", "1y"}
+TOOL_TIMEOUT = 15
 
 
 def _human_number(value: Any) -> str:
@@ -44,19 +46,9 @@ def _format_price(value: Any) -> str:
         return str(value)
 
 
-def get_ticker_overview(ticker: str, tool_context: ToolContext) -> str:
-    """Return a concise yfinance overview for a public ticker."""
-    symbol = ticker.strip().upper()
-    if not symbol:
-        return "No data found for ticker: "
-
-    try:
-        stock = yf.Ticker(symbol)
-        info = stock.info or {}
-    except Exception:
-        logger.warning("Could not fetch ticker overview for %s", symbol, exc_info=True)
-        return f"No data found for ticker: {symbol}"
-
+def _fetch_ticker_overview(symbol: str) -> str:
+    stock = yf.Ticker(symbol)
+    info = stock.info or {}
     quote_type = info.get("quoteType")
     name = info.get("longName") or info.get("shortName")
     price = info.get("currentPrice") or info.get("regularMarketPrice")
@@ -87,19 +79,8 @@ def get_ticker_overview(ticker: str, tool_context: ToolContext) -> str:
     )
 
 
-def get_price_history(ticker: str, period: str, tool_context: ToolContext) -> str:
-    """Return up to 30 OHLCV rows for a ticker."""
-    symbol = ticker.strip().upper()
-    normalized_period = period if period in VALID_PERIODS else "1mo"
-    if not symbol:
-        return "No price history found for ticker: "
-
-    try:
-        history = yf.download(symbol, period=normalized_period, auto_adjust=True, progress=False)
-    except Exception as exc:
-        logger.warning("Could not fetch price history for %s", symbol, exc_info=True)
-        return f"Could not fetch price history for {symbol}: {exc}"
-
+def _fetch_price_history(symbol: str, period: str) -> str:
+    history = yf.download(symbol, period=period, auto_adjust=True, progress=False)
     if history.empty:
         return f"No price history found for ticker: {symbol}"
 
@@ -122,3 +103,46 @@ def get_price_history(ticker: str, period: str, tool_context: ToolContext) -> st
         )
 
     return "\n".join(rows)
+
+
+def get_ticker_overview(ticker: str, tool_context: ToolContext) -> str:
+    """Return a concise yfinance overview for a public ticker."""
+    symbol = ticker.strip().upper()
+    if not symbol:
+        return "No data found for ticker: "
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(_fetch_ticker_overview, symbol)
+        return future.result(timeout=TOOL_TIMEOUT)
+    except concurrent.futures.TimeoutError:
+        future.cancel()
+        logger.warning("Timeout fetching ticker overview for %s", symbol)
+        return f"Timeout fetching data for {symbol}. Market data temporarily unavailable."
+    except Exception:
+        logger.warning("Could not fetch ticker overview for %s", symbol, exc_info=True)
+        return f"No data found for ticker: {symbol}"
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
+def get_price_history(ticker: str, period: str, tool_context: ToolContext) -> str:
+    """Return up to 30 OHLCV rows for a ticker."""
+    symbol = ticker.strip().upper()
+    normalized_period = period if period in VALID_PERIODS else "1mo"
+    if not symbol:
+        return "No price history found for ticker: "
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(_fetch_price_history, symbol, normalized_period)
+        return future.result(timeout=TOOL_TIMEOUT)
+    except concurrent.futures.TimeoutError:
+        future.cancel()
+        logger.warning("Timeout fetching price history for %s", symbol)
+        return f"Timeout fetching price history for {symbol}. Market data temporarily unavailable."
+    except Exception as exc:
+        logger.warning("Could not fetch price history for %s", symbol, exc_info=True)
+        return f"Could not fetch price history for {symbol}: {exc}"
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)

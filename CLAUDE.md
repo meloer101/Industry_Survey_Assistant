@@ -196,10 +196,14 @@ Read these before writing any new code:
 ## Development Commands
 
 ```bash
+# First-time setup: copy env templates
+cp backend/app/.env.example backend/app/.env   # then fill in real API keys
+cp frontend/.env.example frontend/.env          # set VITE_API_KEY to match APP_API_KEY
+
 # Backend (from project root)
 cd backend
 uv sync
-uv run adk web          # ADK dev server on :8000
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 # Frontend (from project root)
 cd frontend
@@ -207,23 +211,19 @@ npm install
 npm run dev             # Vite dev server on :5173, proxied to :8000
 
 # Run both together (from project root)
-# Terminal 1: cd backend && uv run adk web
+# Terminal 1: cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 # Terminal 2: cd frontend && npm run dev
 ```
 
 ## Environment Variables (`backend/app/.env`)
 
+See `backend/app/.env.example` for the full reference. Key variables:
+
 ```
-# AI Studio (preferred for local dev — no GCP needed)
-GOOGLE_API_KEY=your_key_here
-
-# Vertex AI (alternative)
-# GOOGLE_GENAI_USE_VERTEXAI=True
-# GOOGLE_CLOUD_PROJECT=your_project
-# GOOGLE_CLOUD_LOCATION=global
-
-# Optional: FRED API key for higher rate limits
-# FRED_API_KEY=your_key_here
+DEEPSEEK_API_KEY=...         # Required: LLM provider
+TAVILY_API_KEY=...            # Required: web search
+APP_API_KEY=...               # Auth key (leave empty to disable auth in dev)
+ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 ---

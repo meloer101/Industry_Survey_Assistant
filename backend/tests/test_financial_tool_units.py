@@ -1,5 +1,10 @@
+import time
+
+from app.agent import PipelineGuard
+from app.tools import market_data
 from app.tools.fetch_transcript import _candidate_urls
 from app.tools.rate_probability import _extract_probabilities
+from app.tools import search
 from app.tools.search import tavily_search
 from app.config import ResearchConfiguration
 
@@ -28,6 +33,51 @@ def test_tavily_search_missing_key_returns_friendly_error(monkeypatch):
     result = tavily_search("Fed rate outlook", tool_context=None)
 
     assert result == "Search unavailable: TAVILY_API_KEY is not configured."
+
+
+def test_tavily_search_timeout_returns_friendly_error(monkeypatch):
+    class SlowTavilyClient:
+        def __init__(self, api_key: str):
+            self.api_key = api_key
+
+        def search(self, query: str, search_depth: str, max_results: int):
+            time.sleep(0.05)
+            return {"results": []}
+
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+    monkeypatch.setattr(search, "TavilyClient", SlowTavilyClient)
+    monkeypatch.setattr(search, "TAVILY_TIMEOUT", 0.001)
+
+    result = tavily_search("Fed rate outlook", tool_context=None)
+
+    assert result == "Search unavailable: Tavily request timed out. Try again later."
+
+
+def test_market_data_timeout_returns_friendly_error(monkeypatch):
+    def slow_fetch(symbol: str):
+        time.sleep(0.05)
+        return "unexpected"
+
+    monkeypatch.setattr(market_data, "_fetch_ticker_overview", slow_fetch)
+    monkeypatch.setattr(market_data, "TOOL_TIMEOUT", 0.001)
+
+    result = market_data.get_ticker_overview("NVDA", tool_context=None)
+
+    assert result == "Timeout fetching data for NVDA. Market data temporarily unavailable."
+
+
+def test_pipeline_guard_builds_partial_report_from_state():
+    state = {
+        "section_research_findings": "Finding A",
+        "macro_analysis_output": "Macro B",
+    }
+
+    result = PipelineGuard._build_partial_report(state, RuntimeError("boom"))
+
+    assert "# Research interrupted" in result
+    assert "## Research Findings\n\nFinding A" in result
+    assert "## Macro Analysis\n\nMacro B" in result
+    assert "boom" not in result
 
 
 def test_max_search_iterations_reads_environment(monkeypatch):
