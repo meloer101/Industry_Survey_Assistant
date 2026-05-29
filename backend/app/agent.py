@@ -13,6 +13,7 @@ from google.adk.tools.agent_tool import AgentTool
 from google.genai import types as genai_types
 
 from .agents.analysis.coordinator import analysis_coordinator
+from .callbacks import rate_limit_callback
 from .config import config
 from .tools.compare_statements import compare_fed_statements
 from .tools.fetch_transcript import fetch_fomc_transcript
@@ -129,6 +130,21 @@ plan_generator = LlmAgent(
     Only use `tavily_search` if a topic is ambiguous and you cannot create a plan without key identifying information.
     Do not research the *content* of the topic. That is the next agent's job.
     Current date: {datetime.datetime.now().strftime("%Y-%m-%d")}
+
+    **FINANCIAL TOPIC GUIDANCE:**
+    When the research topic involves financial markets, investments, economic policy, or specific companies:
+    - Include a [RESEARCH] goal for quantitative data gathering (prices, ratios, rates, earnings figures)
+    - Include a [RESEARCH] goal for recent news flow and analyst/institutional opinions
+    - For macro/central-bank topics: include a goal explicitly covering the policy stance, forward guidance, and rate path expectations
+    - For equity/company topics: include a goal covering recent earnings results and current valuation multiples vs. sector peers
+    - Always add a [DELIVERABLE][IMPLIED] for risk assessment (bull/bear scenarios and key downside risks)
+
+    Examples of strong financial research goals:
+    - [RESEARCH] Analyze the Federal Reserve's 2025 rate decisions, dot-plot projections, and market-implied path
+    - [RESEARCH] Investigate NVDA's most recent quarterly earnings beat/miss, revenue guidance, and margin trends
+    - [RESEARCH] Compare current sector P/E and EV/EBITDA multiples to their 5-year historical averages
+    - [RESEARCH] Identify key macroeconomic indicators (CPI, PCE, NFP) influencing the current policy debate
+    - [DELIVERABLE][IMPLIED] Compile a risk-return assessment with explicit bull, base, and bear scenarios
     """,
     tools=[tavily_search],
 )
@@ -188,6 +204,7 @@ section_researcher = LlmAgent(
         fetch_fomc_transcript,
     ],
     output_key="section_research_findings",
+    before_model_callback=rate_limit_callback,
 )
 
 
@@ -208,6 +225,13 @@ research_evaluator = LlmAgent(
     Be critical. If you find significant gaps, grade "fail" and generate 5-7 specific follow-up queries.
     If research thoroughly covers the topic, grade "pass".
 
+    **FINANCIAL-SPECIFIC QUALITY CRITERIA (apply when the topic is financial):**
+    - Data Recency: financial claims must reference data no older than 3 months, unless historical analysis is the explicit goal. If findings cite only stale data, grade "fail".
+    - Source Credibility: prefer official sources (Fed statements, SEC filings, company earnings releases, central bank speeches) over opinion blogs. Flag if key claims rely solely on low-credibility sources.
+    - Quantitative Rigor: key claims must include specific numbers — prices, percentages, dates, ratios. Vague statements like "stocks went up" or "the economy is slowing" with no figures are insufficient; grade "fail" and request concrete data.
+    - Coverage Balance: for equity topics, verify both bull and bear cases are present. For macro topics, verify at least two distinct economic indicators are discussed. A one-sided analysis is incomplete.
+    - Tool Data Usage: if the topic involves a named ticker or a specific FOMC meeting date, check whether the findings include live market data or transcript/statement data. If clearly missing and the topic warrants it, grade "fail" and request it.
+
     Current date: {datetime.datetime.now().strftime("%Y-%m-%d")}
 
     **OUTPUT FORMAT — you MUST respond with ONLY a raw JSON object, no markdown fences, no extra text:**
@@ -224,6 +248,7 @@ research_evaluator = LlmAgent(
     disallow_transfer_to_parent=True,
     disallow_transfer_to_peers=True,
     output_key="research_evaluation",
+    before_model_callback=rate_limit_callback,
     after_agent_callback=parse_evaluation_callback,
 )
 
@@ -254,6 +279,7 @@ enhanced_search_executor = LlmAgent(
         fetch_fomc_transcript,
     ],
     output_key="section_research_findings",
+    before_model_callback=rate_limit_callback,
 )
 
 

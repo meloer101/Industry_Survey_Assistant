@@ -1,6 +1,7 @@
 from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
 
+from ...callbacks import rate_limit_callback
 from ...config import config
 from .fundamental_agent import fundamental_analysis_agent
 from .macro_agent import macro_analysis_agent
@@ -66,4 +67,5 @@ analysis_coordinator = LlmAgent(
         AgentTool(risk_analysis_agent),
     ],
     output_key="analysis_summary",
+    before_model_callback=rate_limit_callback,
 )

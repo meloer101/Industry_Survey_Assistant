@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import logging
 import re
 
 from google.adk.tools import ToolContext
@@ -12,6 +13,7 @@ FED_FILES_BASE = "https://www.federalreserve.gov/monetarypolicy/files"
 MAX_RETURN_CHARS = 8000
 REQUEST_TIMEOUT = 30
 LIKELY_FOMC_MEETING_DAYS = (18, 19, 20, 17, 16, 15, 14, 13, 12, 29, 30, 31)
+logger = logging.getLogger(__name__)
 
 
 def _extract_pdf_text(pdf_bytes: bytes) -> str:
@@ -80,8 +82,10 @@ def fetch_fomc_transcript(year: int, month: int, tool_context: ToolContext) -> s
             suffix = f"\n\n[Source: {url}; total characters: {total_chars}; showing first {len(excerpt)}]"
             return excerpt + suffix
     except requests.Timeout:
+        logger.warning("Timeout fetching FOMC transcript for %s-%02d", year, month, exc_info=True)
         return "Timeout fetching transcript. Try again or use a different date."
     except Exception as exc:
+        logger.warning("Error fetching FOMC transcript for %s-%02d", year, month, exc_info=True)
         return f"Error fetching transcript for {year}-{month:02d}: {exc}"
 
     if last_status == 404 or last_status is None:

@@ -1,5 +1,6 @@
 from google.adk.agents import LlmAgent
 
+from ...callbacks import rate_limit_callback
 from ...config import config
 from ...tools.market_data import get_price_history, get_ticker_overview
 
@@ -51,4 +52,5 @@ fundamental_analysis_agent = LlmAgent(
         get_price_history,
     ],
     output_key="fundamental_analysis_output",
+    before_model_callback=rate_limit_callback,
 )

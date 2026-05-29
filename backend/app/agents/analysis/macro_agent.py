@@ -1,5 +1,6 @@
 from google.adk.agents import LlmAgent
 
+from ...callbacks import rate_limit_callback
 from ...config import config
 from ...tools.compare_statements import compare_fed_statements
 from ...tools.fetch_transcript import fetch_fomc_transcript
@@ -49,4 +50,5 @@ macro_analysis_agent = LlmAgent(
         compare_fed_statements,
     ],
     output_key="macro_analysis_output",
+    before_model_callback=rate_limit_callback,
 )

@@ -1,5 +1,6 @@
 from google.adk.agents import LlmAgent
 
+from ...callbacks import rate_limit_callback
 from ...config import config
 
 
@@ -76,4 +77,5 @@ risk_analysis_agent = LlmAgent(
     instruction=RISK_ANALYSIS_PROMPT,
     tools=[],
     output_key="risk_analysis_output",
+    before_model_callback=rate_limit_callback,
 )
