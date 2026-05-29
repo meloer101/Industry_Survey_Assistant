@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -16,7 +17,7 @@ RATE_LIMIT_SECS = 60
 RPM_QUOTA = int(os.environ.get("LLM_RPM_QUOTA", "60"))
 
 
-def rate_limit_callback(
+async def rate_limit_callback(
     callback_context: CallbackContext, llm_request: LlmRequest
 ) -> None:
     """Apply a session-wide rolling RPM limit before model calls."""
@@ -58,7 +59,7 @@ def rate_limit_callback(
         delay = RATE_LIMIT_SECS - elapsed_secs + 1
         if delay > 0:
             logger.debug("rate_limit_callback sleeping for %.2f seconds", delay)
-            time.sleep(delay)
+            await asyncio.sleep(delay)
         callback_context.state["timer_start"] = time.time()
         callback_context.state["request_count"] = 1
         return

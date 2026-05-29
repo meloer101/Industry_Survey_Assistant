@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import re
+import time
 from collections.abc import AsyncGenerator
 
 from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, SequentialAgent
@@ -20,6 +21,8 @@ from .tools.fetch_transcript import fetch_fomc_transcript
 from .tools.market_data import get_price_history, get_ticker_overview
 from .tools.rate_probability import get_rate_move_probability
 from .tools.search import tavily_search
+
+logger = logging.getLogger(__name__)
 
 
 # --- Callbacks ---
@@ -47,7 +50,10 @@ def parse_evaluation_callback(callback_context: CallbackContext) -> None:
         parsed = json.loads(clean)
         callback_context.state["research_evaluation"] = parsed
     except json.JSONDecodeError:
-        logging.warning(f"[parse_evaluation_callback] JSON parse failed, defaulting to fail. Raw: {raw[:300]}")
+        logger.warning(
+            "[parse_evaluation_callback] JSON parse failed, defaulting to fail. Raw: %.300s",
+            raw,
+        )
         callback_context.state["research_evaluation"] = {
             "grade": "fail",
             "comment": raw,
@@ -65,7 +71,7 @@ def citation_replacement_callback(
     def tag_replacer(match: re.Match) -> str:
         short_id = match.group(1)
         if not (source_info := sources.get(short_id)):
-            logging.warning(f"Invalid citation tag removed: {match.group(0)}")
+            logger.warning("Invalid citation tag removed: %s", match.group(0))
             return ""
         display_text = source_info.get("title", source_info.get("domain", short_id))
         return f" [{display_text}]({source_info['url']})"
@@ -92,11 +98,84 @@ class EscalationChecker(BaseAgent):
     ) -> AsyncGenerator[Event, None]:
         evaluation_result = ctx.session.state.get("research_evaluation")
         if evaluation_result and evaluation_result.get("grade") == "pass":
-            logging.info(f"[{self.name}] Research passed. Escalating to stop loop.")
+            logger.info("[%s] Research passed. Escalating to stop loop.", self.name)
             yield Event(author=self.name, actions=EventActions(escalate=True))
         else:
-            logging.info(f"[{self.name}] Research failed or not evaluated. Loop continues.")
+            logger.info("[%s] Research failed or not evaluated. Loop continues.", self.name)
             yield Event(author=self.name)
+
+
+class PipelineGuard(BaseAgent):
+    """Wraps the research pipeline and emits partial results on failure."""
+
+    def __init__(self, pipeline: BaseAgent):
+        super().__init__(name="pipeline_guard", sub_agents=[pipeline])
+        self._pipeline = pipeline
+
+    async def _run_async_impl(
+        self, ctx: InvocationContext
+    ) -> AsyncGenerator[Event, None]:
+        try:
+            async for event in self._pipeline.run_async(ctx):
+                yield event
+        except Exception as exc:
+            logger.error("[PipelineGuard] Pipeline failed: %s", exc, exc_info=True)
+            state = ctx.session.state
+            partial_report = self._build_partial_report(state, exc)
+
+            state["final_cited_report"] = partial_report
+            state["final_report_with_citations"] = partial_report
+
+            yield Event(
+                author=self.name,
+                actions=EventActions(
+                    state_delta={"final_report_with_citations": partial_report}
+                ),
+            )
+
+    @staticmethod
+    def _build_partial_report(state: dict, exc: Exception) -> str:
+        parts = [
+            "# Research interrupted\n\n"
+            "The research pipeline stopped before the final report could be completed. "
+            "Partial results available before the interruption are shown below.\n"
+        ]
+
+        if findings := state.get("section_research_findings"):
+            parts.append(f"## Research Findings\n\n{findings}\n")
+        if macro := state.get("macro_analysis_output"):
+            parts.append(f"## Macro Analysis\n\n{macro}\n")
+        if fundamental := state.get("fundamental_analysis_output"):
+            parts.append(f"## Fundamental Analysis\n\n{fundamental}\n")
+        if risk := state.get("risk_analysis_output"):
+            parts.append(f"## Risk Assessment\n\n{risk}\n")
+
+        if len(parts) == 1:
+            parts.append(
+                "The pipeline stopped before it produced usable intermediate results.\n\n"
+                f"Error: {exc}"
+            )
+
+        return "\n".join(parts)
+
+
+def _pipeline_start_callback(callback_context: CallbackContext) -> None:
+    callback_context.state["_pipeline_start_ts"] = time.time()
+    logger.info("[pipeline] research_pipeline started")
+
+
+def _pipeline_end_callback(callback_context: CallbackContext) -> None:
+    start = callback_context.state.get("_pipeline_start_ts")
+    if not start:
+        return
+
+    elapsed = time.time() - float(start)
+    source_count = len(callback_context.state.get("sources", {}))
+    logger.info(
+        "[pipeline] research_pipeline finished in %.1fs, sources=%d",
+        elapsed,
+        source_count,
+    )
 
 
 # --- Agent Definitions ---
@@ -334,6 +413,8 @@ report_composer = LlmAgent(
 research_pipeline = SequentialAgent(
     name="research_pipeline",
     description="Executes a pre-approved research plan with iterative refinement and produces a final cited report.",
+    before_agent_callback=_pipeline_start_callback,
+    after_agent_callback=_pipeline_end_callback,
     sub_agents=[
         section_planner,
         section_researcher,
@@ -350,6 +431,9 @@ research_pipeline = SequentialAgent(
         report_composer,
     ],
 )
+
+
+guarded_pipeline = PipelineGuard(research_pipeline)
 
 
 interactive_planner_agent = LlmAgent(
@@ -369,7 +453,7 @@ interactive_planner_agent = LlmAgent(
     Current date: {datetime.datetime.now().strftime("%Y-%m-%d")}
     Do not perform any research yourself. Your job is to Plan, Refine, and Delegate.
     """,
-    sub_agents=[research_pipeline],
+    sub_agents=[guarded_pipeline],
     tools=[AgentTool(plan_generator)],
     output_key="research_plan",
 )

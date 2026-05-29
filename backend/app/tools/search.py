@@ -1,11 +1,13 @@
 import os
 import logging
+import concurrent.futures
 
 from google.adk.tools import ToolContext
 from tavily import TavilyClient
 
 
 logger = logging.getLogger(__name__)
+TAVILY_TIMEOUT = 20
 
 
 def tavily_search(query: str, tool_context: ToolContext) -> str:
@@ -23,12 +25,23 @@ def tavily_search(query: str, tool_context: ToolContext) -> str:
         logger.warning("Tavily search skipped because TAVILY_API_KEY is not configured.")
         return "Search unavailable: TAVILY_API_KEY is not configured."
 
-    try:
+    def _do_search() -> dict:
         client = TavilyClient(api_key=api_key)
-        response = client.search(query, search_depth="basic", max_results=5)
+        return client.search(query, search_depth="basic", max_results=5)
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(_do_search)
+        response = future.result(timeout=TAVILY_TIMEOUT)
+    except concurrent.futures.TimeoutError:
+        future.cancel()
+        logger.warning("Tavily search timed out for query: %s", query)
+        return "Search unavailable: Tavily request timed out. Try again later."
     except Exception:
         logger.warning("Tavily search failed for query: %s", query, exc_info=True)
         return "Search unavailable: Tavily request failed. Try again later."
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     url_to_short_id: dict = tool_context.state.get("url_to_short_id", {})
     sources: dict = tool_context.state.get("sources", {})
