@@ -13,6 +13,7 @@ import {
   retryWithBackoff,
   createSession,
   checkBackendHealth,
+  loadSession,
   requestHeaders,
   USER_ID_STORAGE_KEY,
 } from "@/lib/api";
@@ -311,16 +312,50 @@ export default function App() {
     analysisOutputsRef.current = {};
   }, []);
 
-  const handleSelectHistorySession = useCallback((selectedSessionId: string) => {
-    setSessionId(selectedSessionId);
-    setAppName("app");
-    setMessages(prev => [...prev, {
-      type: "ai",
-      content: `已选择历史会话 ${selectedSessionId}。你可以继续提问；完整历史报告加载将在后续版本支持。`,
-      id: `${Date.now()}_history`,
-      agent: "history",
-    }]);
-  }, []);
+  const handleSelectHistorySession = useCallback(async (selectedSessionId: string) => {
+    if (!userId) return;
+    // Reset current chat state
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setMessages([]);
+    setDisplayData(null);
+    setMessageEvents(new Map());
+    setWebsiteCount(0);
+    setIsLoading(true);
+    analysisOutputsRef.current = {};
+
+    try {
+      const loaded = await loadSession(userId, selectedSessionId);
+      setSessionId(loaded.sessionId);
+      setAppName(loaded.appName);
+      // [P2] Restore analysis outputs into the ref so follow-up SSE events can merge correctly
+      analysisOutputsRef.current = loaded.analysisOutputs;
+      if (loaded.messages.length > 0) {
+        setMessages(loaded.messages);
+      } else {
+        setMessages([{
+          type: "ai",
+          content: "已加载历史会话，暂无可显示的消息。",
+          id: `${Date.now()}_history`,
+          agent: "history",
+        }]);
+      }
+    } catch (err) {
+      console.error("Failed to load session", err);
+      // [P2] Clear session identity so the next prompt starts a fresh session
+      // rather than accidentally continuing a partially-loaded one
+      setSessionId(null);
+      setAppName(null);
+      setMessages([{
+        type: "ai",
+        content: "历史会话加载失败，请重试。",
+        id: `${Date.now()}_history`,
+        agent: "history",
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
 
   return (
     <div className="flex h-screen bg-white text-gray-900 font-sans antialiased">

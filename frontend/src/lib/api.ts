@@ -74,6 +74,106 @@ export async function createSession(
   };
 }
 
+export interface SessionEvent {
+  author: string;
+  content: {
+    role?: string;
+    parts?: Array<{
+      text?: string;
+      thought?: boolean;
+      functionCall?: unknown;
+      functionResponse?: unknown;
+    }>;
+  } | null;
+}
+
+export interface AnalysisOutputs {
+  macro?: string;
+  fundamental?: string;
+  risk?: string;
+}
+
+export interface LoadedSession {
+  sessionId: string;
+  appName: string;
+  userId: string;
+  analysisOutputs: AnalysisOutputs;
+  messages: Array<{ type: "human" | "ai"; content: string; id: string; agent?: string; finalReportWithCitations?: boolean; analysisOutputs?: AnalysisOutputs }>;
+}
+
+// Agents whose plain text messages should appear in the chat as AI messages
+const VISIBLE_AI_AUTHORS = new Set([
+  "interactive_planner_agent",
+  "report_composer_with_citations",
+  "report_composer",
+]);
+
+export async function loadSession(
+  userId: string,
+  sessionId: string,
+): Promise<LoadedSession> {
+  const response = await fetch(
+    `/api/apps/app/users/${userId}/sessions/${sessionId}`,
+    { headers: requestHeaders },
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to load session: ${response.status}`);
+  }
+  const data = await response.json();
+  const events: SessionEvent[] = data.events ?? [];
+  const state: Record<string, string> = data.state ?? {};
+  const messages: LoadedSession["messages"] = [];
+
+  // [P2] Restore analysis outputs from session state
+  const analysisOutputs: AnalysisOutputs = {};
+  if (state.macro_analysis_output) analysisOutputs.macro = state.macro_analysis_output;
+  if (state.fundamental_analysis_output) analysisOutputs.fundamental = state.fundamental_analysis_output;
+  if (state.risk_analysis_output) analysisOutputs.risk = state.risk_analysis_output;
+
+  for (const ev of events) {
+    const parts = ev.content?.parts ?? [];
+    const hasFunctionCall = parts.some((p) => "functionCall" in p);
+    const hasFunctionResponse = parts.some((p) => "functionResponse" in p);
+    if (hasFunctionCall || hasFunctionResponse) continue;
+
+    // [P1] Exclude thought parts (internal reasoning) from visible text
+    const text = parts
+      .filter((p) => !p.thought)
+      .map((p) => p.text ?? "")
+      .join("")
+      .trim();
+    if (!text) continue;
+
+    if (ev.author === "user") {
+      messages.push({ type: "human", content: text, id: `hist_${messages.length}` });
+    } else if (VISIBLE_AI_AUTHORS.has(ev.author)) {
+      const isFinalReport =
+        ev.author === "report_composer_with_citations" ||
+        ev.author === "report_composer";
+      // For report_composer, only keep the actual report (starts with #) not the internal thinking preamble
+      if (isFinalReport && !text.startsWith("#")) continue;
+      messages.push({
+        type: "ai",
+        content: text,
+        id: `hist_${messages.length}`,
+        agent: ev.author,
+        // [P2] Attach analysis outputs to the final report message so AnalysisPanel renders
+        ...(isFinalReport
+          ? { finalReportWithCitations: true, analysisOutputs }
+          : {}),
+      });
+    }
+  }
+
+  return {
+    sessionId: data.id,
+    appName: data.appName,
+    userId: data.userId,
+    analysisOutputs,
+    messages,
+  };
+}
+
 export async function checkBackendHealth(): Promise<boolean> {
   try {
     const response = await fetch("/api/health", {
