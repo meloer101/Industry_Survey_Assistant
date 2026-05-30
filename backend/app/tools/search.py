@@ -8,6 +8,16 @@ from tavily import TavilyClient
 
 logger = logging.getLogger(__name__)
 TAVILY_TIMEOUT = 20
+_client: TavilyClient | None = None
+_client_api_key: str | None = None
+
+
+def _get_tavily_client(api_key: str) -> TavilyClient:
+    global _client, _client_api_key
+    if _client is None or _client_api_key != api_key:
+        _client = TavilyClient(api_key=api_key)
+        _client_api_key = api_key
+    return _client
 
 
 def tavily_search(query: str, tool_context: ToolContext) -> str:
@@ -26,7 +36,7 @@ def tavily_search(query: str, tool_context: ToolContext) -> str:
         return "Search unavailable: TAVILY_API_KEY is not configured."
 
     def _do_search() -> dict:
-        client = TavilyClient(api_key=api_key)
+        client = _get_tavily_client(api_key)
         return client.search(query, search_depth="basic", max_results=5)
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)

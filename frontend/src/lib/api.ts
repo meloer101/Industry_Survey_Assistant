@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { devWarn } from "@/lib/logging";
 
 const API_KEY = import.meta.env.VITE_API_KEY ?? "";
 
@@ -31,7 +32,7 @@ export async function retryWithBackoff<T>(
       }
       lastError = error as Error;
       const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
-      console.warn(
+      devWarn(
         `Attempt ${attempt + 1} failed, retrying in ${delay}ms...`,
         error,
       );

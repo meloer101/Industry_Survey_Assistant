@@ -121,13 +121,26 @@ def create_app():
         return JSONResponse(result, status_code=202 if result["cancelled"] else 404)
 
     @fast_api_app.get("/history/{user_id}", include_in_schema=True)
-    async def history(user_id: str) -> JSONResponse:
+    async def history(user_id: str, limit: int = 20, offset: int = 0) -> JSONResponse:
         db_path = get_sqlite_path_from_url()
         if db_path is None:
             logger.warning("history endpoint supports local SQLite session storage only")
-            return JSONResponse({"sessions": []})
-        sessions = list_research_history(db_path=db_path, user_id=user_id, limit=20)
-        return JSONResponse({"sessions": sessions})
+            return JSONResponse({"sessions": [], "has_more": False})
+
+        normalized_limit = min(max(limit, 1), 100)
+        normalized_offset = max(offset, 0)
+        sessions = list_research_history(
+            db_path=db_path,
+            user_id=user_id,
+            limit=normalized_limit + 1,
+            offset=normalized_offset,
+        )
+        return JSONResponse(
+            {
+                "sessions": sessions[:normalized_limit],
+                "has_more": len(sessions) > normalized_limit,
+            }
+        )
 
     install_session_cleanup_lifespan(fast_api_app)
 

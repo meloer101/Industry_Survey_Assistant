@@ -72,6 +72,40 @@ def test_tavily_search_timeout_returns_friendly_error(monkeypatch):
     assert result == "Search unavailable: Tavily request timed out. Try again later."
 
 
+def test_tavily_search_reuses_client_for_same_api_key(monkeypatch):
+    instances = []
+
+    class FakeTavilyClient:
+        def __init__(self, api_key: str):
+            self.api_key = api_key
+            instances.append(self)
+
+        def search(self, query: str, search_depth: str, max_results: int):
+            return {
+                "results": [
+                    {
+                        "url": f"https://example.com/{query.replace(' ', '-')}",
+                        "title": query,
+                        "content": "result",
+                    }
+                ]
+            }
+
+    class FakeToolContext:
+        def __init__(self):
+            self.state = {}
+
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+    monkeypatch.setattr(search, "TavilyClient", FakeTavilyClient)
+    monkeypatch.setattr(search, "_client", None, raising=False)
+    monkeypatch.setattr(search, "_client_api_key", None, raising=False)
+
+    tavily_search("first query", tool_context=FakeToolContext())
+    tavily_search("second query", tool_context=FakeToolContext())
+
+    assert len(instances) == 1
+
+
 def test_market_data_timeout_returns_friendly_error(monkeypatch):
     def slow_fetch(symbol: str):
         time.sleep(0.05)

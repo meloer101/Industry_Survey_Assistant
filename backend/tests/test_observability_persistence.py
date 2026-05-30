@@ -170,3 +170,36 @@ def test_list_research_history_reads_session_state_newest_first(tmp_path):
     assert history[0]["has_final_report"] is True
     assert history[1]["has_final_report"] is False
     assert "T" in history[0]["update_time"]
+
+
+def test_list_research_history_supports_offset_pagination(tmp_path):
+    from app.persistence import list_research_history
+
+    db_path = tmp_path / "session.db"
+    _create_session_db(db_path)
+    now = time.time()
+    _insert_session(
+        db_path,
+        user_id="u_1",
+        session_id="newest",
+        update_time=now,
+        state={"research_plan": "newest plan"},
+    )
+    _insert_session(
+        db_path,
+        user_id="u_1",
+        session_id="middle",
+        update_time=now - 60,
+        state={"research_plan": "middle plan"},
+    )
+    _insert_session(
+        db_path,
+        user_id="u_1",
+        session_id="oldest",
+        update_time=now - 120,
+        state={"research_plan": "oldest plan"},
+    )
+
+    page = list_research_history(db_path=db_path, user_id="u_1", limit=1, offset=1)
+
+    assert [item["session_id"] for item in page] == ["middle"]

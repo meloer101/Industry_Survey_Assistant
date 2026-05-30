@@ -34,6 +34,10 @@
 | Session 清理无自动调度 | ✅ 已修复 | FastAPI startup/shutdown 注册后台 session cleanup loop |
 | 无 metrics 采集 | ✅ 已修复 | `/metrics` 暴露 Prometheus 文本格式 pipeline metrics |
 | 无分布式 tracing | ✅ 已修复 | pipeline callbacks 生成 trace id 并创建 OpenTelemetry span |
+| CI lint 只做 `py_compile` | ✅ 已修复 | backend dev 依赖加入 `ruff`，CI 执行 `uv run ruff check .` |
+| 前端 `console.warn` / `console.log` 残留 | ✅ 已修复 | retry/cancel 日志改为 dev-only，Vite proxy 日志默认关闭 |
+| History panel 无分页 | ✅ 已修复 | `/history/{user_id}` 支持 `limit/offset`，前端添加“加载更多” |
+| `TavilyClient` 每次搜索都重新创建 | ✅ 已修复 | `tavily_search` 按 API key 复用模块级 client |
 
 ---
 
@@ -42,38 +46,21 @@
 ### P0 — 安全与稳定性（Critical）
 
 截至 2026-05-30，本文件中列出的 P0 项已全部修复并补充回归测试。
-剩余缺陷从 P2 开始。
+剩余缺陷从 P3 开始。
 
 ---
 
 ### P1 — 可运维性（Major）
 
 截至 2026-05-30，本文件中列出的 P1 项已全部修复并补充回归测试。
-剩余缺陷从 P2 开始。
+剩余缺陷从 P3 开始。
 
 ---
 
 ### P2 — 工程质量（Moderate）
 
-#### 8. CI lint 只做 `py_compile`，无真正的 linter
-- **位置：** [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-- **问题：** `py_compile` 只检查语法是否合法，不检查代码风格、未使用导入、类型注解等。
-- **修复方向：** 添加 `uv run ruff check .` 步骤。
-
-#### 9. 前端 `console.warn` / `console.log` 残留
-- **位置：** [`frontend/src/lib/api.ts:35`](frontend/src/lib/api.ts)，[`frontend/vite.config.ts`](frontend/vite.config.ts) proxy 配置
-- **问题：** retry 中的 `console.warn` 和 proxy 调试日志在生产构建中仍会输出。
-- **修复方向：** 在 vite 构建时通过 `esbuild.drop: ['console']` 移除，或用 `import.meta.env.DEV` 条件判断。
-
-#### 10. History panel 无分页
-- **位置：** [`backend/app/persistence.py:49`](backend/app/persistence.py)，[`frontend/src/components/HistoryPanel.tsx`](frontend/src/components/HistoryPanel.tsx)
-- **问题：** `list_research_history` 硬编码 `limit=20`，历史会话超过 20 条后无法加载更多。
-- **修复方向：** `/history/{user_id}` endpoint 支持 `?offset=N` 分页参数，前端添加"加载更多"按钮。
-
-#### 11. `TavilyClient` 每次搜索都重新创建
-- **位置：** [`backend/app/tools/search.py:29`](backend/app/tools/search.py)
-- **问题：** 每次 `tavily_search` 调用都 `TavilyClient(api_key=...)` 新建实例，浪费连接资源。
-- **修复方向：** 模块级缓存单例：`_client: TavilyClient | None = None`，首次调用时初始化。
+截至 2026-05-30，本文件中列出的 P2 项已全部修复并补充回归测试。
+剩余缺陷从 P3 开始。
 
 ---
 
@@ -116,7 +103,8 @@ P1（已于 2026-05-30 修复）:
   ├── /metrics pipeline 指标
   └── pipeline trace id + OpenTelemetry span
 
-P2（工程优化）:
+P2（已于 2026-05-30 修复）:
+  ├── CI 添加 ruff linter
   ├── TavilyClient 单例缓存
   ├── 前端 console 日志清理（生产构建）
   └── History panel 分页

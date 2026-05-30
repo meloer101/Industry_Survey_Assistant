@@ -51,6 +51,7 @@ def list_research_history(
     db_path: Path,
     user_id: str,
     limit: int = 20,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     """Return recent research sessions for a user from ADK's SQLite schema."""
 
@@ -66,8 +67,9 @@ def list_research_history(
             WHERE user_id = ?
             ORDER BY update_time DESC
             LIMIT ?
+            OFFSET ?
             """,
-            (user_id, limit),
+            (user_id, limit, offset),
         ).fetchall()
     finally:
         conn.close()

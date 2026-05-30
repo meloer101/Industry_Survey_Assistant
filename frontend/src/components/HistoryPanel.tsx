@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Clock, History, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
+const HISTORY_PAGE_SIZE = 20;
+
 interface HistoryItem {
   session_id: string;
   update_time: string;
@@ -26,19 +28,27 @@ export function HistoryPanel({
 }: HistoryPanelProps) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     if (!userId || !isOpen) return;
 
     let cancelled = false;
     setIsLoading(true);
-    fetch(`/api/history/${userId}`, { headers: requestHeaders })
-      .then((response) => (response.ok ? response.json() : { sessions: [] }))
+    fetch(`/api/history/${userId}?limit=${HISTORY_PAGE_SIZE}&offset=0`, { headers: requestHeaders })
+      .then((response) => (response.ok ? response.json() : { sessions: [], has_more: false }))
       .then((data) => {
-        if (!cancelled) setHistory(data.sessions ?? []);
+        if (!cancelled) {
+          setHistory(data.sessions ?? []);
+          setHasMore(Boolean(data.has_more));
+        }
       })
       .catch(() => {
-        if (!cancelled) setHistory([]);
+        if (!cancelled) {
+          setHistory([]);
+          setHasMore(false);
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -48,6 +58,25 @@ export function HistoryPanel({
       cancelled = true;
     };
   }, [isOpen, requestHeaders, userId]);
+
+  const loadMore = async () => {
+    if (!userId || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const response = await fetch(
+        `/api/history/${userId}?limit=${HISTORY_PAGE_SIZE}&offset=${history.length}`,
+        { headers: requestHeaders },
+      );
+      const data = response.ok ? await response.json() : { sessions: [], has_more: false };
+      setHistory((prev) => [...prev, ...(data.sessions ?? [])]);
+      setHasMore(Boolean(data.has_more));
+    } catch {
+      setHasMore(false);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   return (
     <aside
@@ -100,6 +129,17 @@ export function HistoryPanel({
                     </div>
                   </button>
                 ))}
+                {hasMore && (
+                  <button
+                    type="button"
+                    aria-label="加载更多历史记录"
+                    onClick={loadMore}
+                    disabled={isLoadingMore}
+                    className="mt-2 w-full rounded-md border border-gray-200 bg-white px-2 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isLoadingMore ? "正在加载..." : "加载更多"}
+                  </button>
+                )}
               </div>
             )}
           </div>

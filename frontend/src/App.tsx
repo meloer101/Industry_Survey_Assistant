@@ -18,6 +18,7 @@ import {
   requestHeaders,
   USER_ID_STORAGE_KEY,
 } from "@/lib/api";
+import { devWarn } from "@/lib/logging";
 
 type DisplayData = string | null;
 
@@ -305,7 +306,7 @@ export default function App() {
   const handleCancel = useCallback(() => {
     if (appName && userId && sessionId) {
       void cancelRun(appName, userId, sessionId).catch((error) => {
-        console.warn("Failed to notify backend run cancellation", error);
+        devWarn("Failed to notify backend run cancellation", error);
       });
     }
     abortControllerRef.current?.abort();
