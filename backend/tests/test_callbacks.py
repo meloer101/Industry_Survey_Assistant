@@ -6,10 +6,15 @@ writes to state["final_report_with_citations"], and returns a genai Content.
 """
 
 import json
+import gc
+import weakref
+import pytest
 
+from app import callbacks
 from app.callbacks import (
     parse_evaluation_callback,
     citation_replacement_callback,
+    rate_limit_callback,
 )
 
 
@@ -18,6 +23,89 @@ class _FakeCallbackContext:
 
     def __init__(self, state: dict):
         self.state = state
+
+
+class _FakeSession:
+    def __init__(self, session_id: str = "session-1"):
+        self.id = session_id
+
+
+class _FakeRateLimitContext(_FakeCallbackContext):
+    def __init__(self, state: dict, session_id: str = "session-1"):
+        super().__init__(state)
+        self.session = _FakeSession(session_id)
+
+
+class _AsyncGuard:
+    def __init__(self):
+        self.enter_count = 0
+        self.exit_count = 0
+        self.active = False
+
+    async def __aenter__(self):
+        self.enter_count += 1
+        self.active = True
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.active = False
+        self.exit_count += 1
+        return False
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_callback_uses_async_lock(monkeypatch):
+    guard = _AsyncGuard()
+    ctx = _FakeRateLimitContext(state={})
+
+    monkeypatch.setattr(
+        "app.callbacks._get_rate_limit_lock",
+        lambda callback_context: guard,
+        raising=False,
+    )
+
+    await rate_limit_callback(ctx, None)
+
+    assert guard.enter_count == 1
+
+
+def test_rate_limit_lock_registry_does_not_keep_session_locks_alive():
+    callbacks._RATE_LIMIT_LOCKS.clear()
+    ctx = _FakeRateLimitContext(state={}, session_id="short-lived-session")
+
+    lock = callbacks._get_rate_limit_lock(ctx)
+    lock_ref = weakref.ref(lock)
+    assert callbacks._RATE_LIMIT_LOCKS["session:short-lived-session"] is lock
+
+    del lock
+    gc.collect()
+
+    assert lock_ref() is None
+    assert "session:short-lived-session" not in callbacks._RATE_LIMIT_LOCKS
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_callback_sleeps_after_releasing_lock(monkeypatch):
+    guard = _AsyncGuard()
+    ctx = _FakeRateLimitContext(
+        state={"timer_start": 1000.0, "request_count": 1},
+        session_id="throttled-session",
+    )
+    sleep_observed_after_lock = False
+
+    async def fake_sleep(_delay: float):
+        nonlocal sleep_observed_after_lock
+        sleep_observed_after_lock = not guard.active
+
+    monkeypatch.setattr(callbacks, "_get_rate_limit_lock", lambda callback_context: guard)
+    monkeypatch.setattr(callbacks, "RPM_QUOTA", 1)
+    monkeypatch.setattr(callbacks, "RATE_LIMIT_SECS", 60)
+    monkeypatch.setattr(callbacks.time, "time", lambda: 1001.0)
+    monkeypatch.setattr(callbacks.asyncio, "sleep", fake_sleep)
+
+    await rate_limit_callback(ctx, None)
+
+    assert guard.exit_count >= 1
+    assert sleep_observed_after_lock is True
 
 
 # ---------------------------------------------------------------------------

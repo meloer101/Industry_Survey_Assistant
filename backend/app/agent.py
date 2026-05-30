@@ -13,11 +13,10 @@ from .config import config
 
 guarded_pipeline = build_research_pipeline()
 
-interactive_planner_agent = LlmAgent(
-    name="interactive_planner_agent",
-    model=config.worker_model,
-    description="The primary research assistant. Collaborates with the user to create a plan, then executes it upon approval.",
-    instruction=f"""
+
+def build_interactive_planner_instruction(context=None) -> str:
+    del context
+    return f"""
     You are a research planning assistant. Your primary function is to convert ANY user request into a research plan.
 
     **CRITICAL RULE: Never answer a question directly or refuse a request.** Your one and only first step is to use the `plan_generator` tool to propose a research plan for the user's topic.
@@ -29,7 +28,14 @@ interactive_planner_agent = LlmAgent(
 
     Current date: {datetime.datetime.now().strftime("%Y-%m-%d")}
     Do not perform any research yourself. Your job is to Plan, Refine, and Delegate.
-    """,
+    """
+
+
+interactive_planner_agent = LlmAgent(
+    name="interactive_planner_agent",
+    model=config.worker_model,
+    description="The primary research assistant. Collaborates with the user to create a plan, then executes it upon approval.",
+    instruction=build_interactive_planner_instruction,
     sub_agents=[guarded_pipeline],
     tools=[AgentTool(plan_generator)],
     output_key="research_plan",

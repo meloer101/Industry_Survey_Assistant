@@ -7,6 +7,7 @@ from google.adk.agents import BaseAgent
 from app.agents.custom import PipelineGuard
 from app.tools import market_data
 from app.tools.fetch_transcript import _candidate_urls
+from app.tools import rate_probability
 from app.tools.rate_probability import _extract_probabilities
 from app.tools import search
 from app.tools.search import tavily_search
@@ -29,6 +30,20 @@ def test_extract_probabilities_handles_percentage_before_action():
 
     assert probabilities["cut_25bp"] == 0.723
     assert probabilities["no_change"] == 0.277
+
+
+def test_rate_probability_times_out_slow_fred_fetch(monkeypatch):
+    def slow_latest_fedfunds():
+        time.sleep(0.05)
+        return ("2026-01-01", 4.33)
+
+    monkeypatch.setattr(rate_probability, "_latest_fedfunds", slow_latest_fedfunds)
+    monkeypatch.setattr(rate_probability, "_tavily_probability_context", lambda meeting_date: None)
+    monkeypatch.setattr(rate_probability, "FRED_TIMEOUT", 0.001, raising=False)
+
+    result = rate_probability.get_rate_move_probability("2026-03-18", tool_context=None)
+
+    assert "FRED FEDFUNDS fetch timed out" in result
 
 
 def test_tavily_search_missing_key_returns_friendly_error(monkeypatch):

@@ -7,7 +7,9 @@ import json
 import logging
 import os
 import re
+import threading
 import time
+import weakref
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmRequest
@@ -18,6 +20,28 @@ logger = logging.getLogger(__name__)
 
 RATE_LIMIT_SECS = 60
 RPM_QUOTA = int(os.environ.get("LLM_RPM_QUOTA", "60"))
+_RATE_LIMIT_LOCKS: weakref.WeakValueDictionary[str, asyncio.Lock] = (
+    weakref.WeakValueDictionary()
+)
+_RATE_LIMIT_LOCKS_GUARD = threading.Lock()
+
+
+def _rate_limit_lock_key(callback_context: CallbackContext) -> str:
+    session = getattr(callback_context, "session", None)
+    session_id = getattr(session, "id", None)
+    if session_id:
+        return f"session:{session_id}"
+    return f"state:{id(callback_context.state)}"
+
+
+def _get_rate_limit_lock(callback_context: CallbackContext) -> asyncio.Lock:
+    key = _rate_limit_lock_key(callback_context)
+    with _RATE_LIMIT_LOCKS_GUARD:
+        lock = _RATE_LIMIT_LOCKS.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            _RATE_LIMIT_LOCKS[key] = lock
+        return lock
 
 
 async def rate_limit_callback(
@@ -25,6 +49,21 @@ async def rate_limit_callback(
 ) -> None:
     """Apply a session-wide rolling RPM limit before model calls."""
     del llm_request
+
+    lock = _get_rate_limit_lock(callback_context)
+    async with lock:
+        delay = _apply_rate_limit(callback_context)
+
+    if delay > 0:
+        logger.debug("rate_limit_callback sleeping for %.2f seconds", delay)
+        await asyncio.sleep(delay)
+        async with lock:
+            callback_context.state["timer_start"] = time.time()
+            callback_context.state["request_count"] = 1
+
+
+def _apply_rate_limit(callback_context: CallbackContext) -> float:
+    """Mutate session rate-limit state while the caller holds the session lock."""
 
     now = time.time()
     timer_start = callback_context.state.get("timer_start")
@@ -37,7 +76,7 @@ async def rate_limit_callback(
             "rate_limit_callback [timestamp: %i, request_count: 1, elapsed_secs: 0]",
             now,
         )
-        return
+        return 0
 
     elapsed_secs = now - float(timer_start)
     if elapsed_secs >= RATE_LIMIT_SECS:
@@ -48,9 +87,10 @@ async def rate_limit_callback(
             now,
             elapsed_secs,
         )
-        return
+        return 0
 
     request_count = int(request_count) + 1
+    callback_context.state["request_count"] = request_count
     logger.debug(
         "rate_limit_callback [timestamp: %i, request_count: %i, elapsed_secs: %.2f]",
         now,
@@ -60,14 +100,9 @@ async def rate_limit_callback(
 
     if request_count > RPM_QUOTA:
         delay = RATE_LIMIT_SECS - elapsed_secs + 1
-        if delay > 0:
-            logger.debug("rate_limit_callback sleeping for %.2f seconds", delay)
-            await asyncio.sleep(delay)
-        callback_context.state["timer_start"] = time.time()
-        callback_context.state["request_count"] = 1
-        return
+        return max(0, delay)
 
-    callback_context.state["request_count"] = request_count
+    return 0
 
 
 def parse_evaluation_callback(callback_context: CallbackContext) -> None:

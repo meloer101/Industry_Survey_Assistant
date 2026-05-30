@@ -1,5 +1,7 @@
 """Smoke tests for the Phase 3 analysis pipeline extension."""
 
+import datetime
+
 
 def test_analysis_agents_import_cleanly():
     from app.agents.analysis.coordinator import analysis_coordinator
@@ -35,3 +37,20 @@ def test_pipeline_includes_analysis_coordinator_before_report_composer():
     assert agent_names.index("analysis_coordinator") < agent_names.index(
         "report_composer_with_citations"
     )
+
+
+def test_interactive_planner_instruction_resolves_current_date(monkeypatch):
+    import app.agent as agent_module
+
+    real_datetime = datetime.datetime
+
+    class FixedDateTime:
+        @classmethod
+        def now(cls):
+            return real_datetime(2031, 1, 2)
+
+    monkeypatch.setattr(agent_module.datetime, "datetime", FixedDateTime)
+
+    instruction = agent_module.interactive_planner_agent.instruction(None)
+
+    assert "Current date: 2031-01-02" in instruction

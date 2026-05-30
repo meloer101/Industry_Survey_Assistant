@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 from datetime import datetime
 import csv
 import io
@@ -16,6 +17,7 @@ from tavily import TavilyClient
 
 FRED_FEDFUNDS_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=FEDFUNDS"
 REQUEST_TIMEOUT = 20
+FRED_TIMEOUT = 20
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +37,18 @@ def _latest_fedfunds() -> tuple[str, float] | None:
         if value and value != ".":
             return row.get("observation_date", ""), float(value)
     return None
+
+
+def _latest_fedfunds_with_timeout() -> tuple[str, float] | None:
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(_latest_fedfunds)
+        return future.result(timeout=FRED_TIMEOUT)
+    except concurrent.futures.TimeoutError as exc:
+        future.cancel()
+        raise TimeoutError("FRED FEDFUNDS fetch timed out") from exc
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def _classify_probability_context(context: str) -> str | None:
@@ -143,7 +157,7 @@ def get_rate_move_probability(meeting_date: str, tool_context: ToolContext) -> s
     current_target_range = "unknown"
     fred_note = "FRED FEDFUNDS data unavailable"
     try:
-        latest = _latest_fedfunds()
+        latest = _latest_fedfunds_with_timeout()
         if latest:
             observation_date, effective_rate = latest
             current_target_range = _target_range_from_effective_rate(effective_rate)
@@ -151,6 +165,9 @@ def get_rate_move_probability(meeting_date: str, tool_context: ToolContext) -> s
                 f"Data from FRED FEDFUNDS series. Latest observation "
                 f"{observation_date}: {effective_rate:.2f}%."
             )
+    except TimeoutError as exc:
+        logger.warning("FRED FEDFUNDS fetch timed out", exc_info=True)
+        fred_note = str(exc)
     except Exception as exc:
         logger.warning("FRED FEDFUNDS fetch failed", exc_info=True)
         fred_note = f"FRED FEDFUNDS fetch failed: {exc}"

@@ -21,6 +21,8 @@ configure_logging()
 APP_API_KEY = os.environ.get("APP_API_KEY", "")
 _startup_time = time.time()
 logger = logging.getLogger(__name__)
+API_KEY_HEADER_NAME = "X-API-Key"
+COOKIE_AUTH_SUPPORTED = False
 
 # Paths that bypass API key auth (health checks, API docs)
 _EXEMPT_PREFIXES = ("/health", "/docs", "/redoc", "/openapi.json")
@@ -30,6 +32,8 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
     """Require X-API-Key header on all non-exempt routes.
 
     When APP_API_KEY is not set, auth is skipped entirely (local dev mode).
+    Auth is intentionally header-only: this service does not accept cookies for
+    API authentication, keeping browser CSRF out of the current threat model.
     """
 
     async def dispatch(self, request: Request, call_next):
@@ -38,7 +42,7 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if any(path.startswith(p) for p in _EXEMPT_PREFIXES):
             return await call_next(request)
-        if request.headers.get("X-API-Key", "") != APP_API_KEY:
+        if request.headers.get(API_KEY_HEADER_NAME, "") != APP_API_KEY:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or missing API key",

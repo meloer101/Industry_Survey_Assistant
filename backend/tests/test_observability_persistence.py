@@ -86,6 +86,13 @@ def test_json_logging_includes_request_id(monkeypatch):
     assert payload["message"] == "pipeline finished"
 
 
+def test_api_key_auth_documents_header_only_csrf_boundary():
+    from app.main import API_KEY_HEADER_NAME, COOKIE_AUTH_SUPPORTED
+
+    assert API_KEY_HEADER_NAME == "X-API-Key"
+    assert COOKIE_AUTH_SUPPORTED is False
+
+
 def test_cleanup_old_sessions_deletes_events_for_expired_sessions(tmp_path):
     from app.tools.session_cleanup import cleanup_old_sessions
 
