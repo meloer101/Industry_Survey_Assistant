@@ -14,6 +14,7 @@ import {
   createSession,
   checkBackendHealth,
   loadSession,
+  cancelRun,
   requestHeaders,
   USER_ID_STORAGE_KEY,
 } from "@/lib/api";
@@ -302,6 +303,11 @@ export default function App() {
   }, []);
 
   const handleCancel = useCallback(() => {
+    if (appName && userId && sessionId) {
+      void cancelRun(appName, userId, sessionId).catch((error) => {
+        console.warn("Failed to notify backend run cancellation", error);
+      });
+    }
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setMessages([]);
@@ -310,7 +316,7 @@ export default function App() {
     setWebsiteCount(0);
     setIsLoading(false);
     analysisOutputsRef.current = {};
-  }, []);
+  }, [appName, sessionId, userId]);
 
   const handleSelectHistorySession = useCallback(async (selectedSessionId: string) => {
     if (!userId) return;

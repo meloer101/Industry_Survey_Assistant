@@ -1,6 +1,7 @@
 """Prune ADK sessions and events older than a configurable TTL."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import sqlite3
@@ -13,6 +14,9 @@ from app.persistence import DEFAULT_SESSION_DB_PATH
 logger = logging.getLogger(__name__)
 
 DEFAULT_TTL_DAYS = int(os.environ.get("SESSION_TTL_DAYS", "30"))
+DEFAULT_CLEANUP_INTERVAL_SECONDS = int(
+    os.environ.get("SESSION_CLEANUP_INTERVAL_SECONDS", str(24 * 60 * 60))
+)
 
 
 def cleanup_old_sessions(
@@ -73,6 +77,33 @@ def cleanup_old_sessions(
         return {"sessions": deleted_sessions, "events": deleted_events}
     finally:
         conn.close()
+
+
+async def run_cleanup_loop(
+    *,
+    cleanup_func=cleanup_old_sessions,
+    interval_seconds: int = DEFAULT_CLEANUP_INTERVAL_SECONDS,
+) -> None:
+    """Run session cleanup immediately and then at a fixed interval."""
+
+    while True:
+        cleanup_func()
+        await asyncio.sleep(interval_seconds)
+
+
+def start_session_cleanup_task() -> asyncio.Task:
+    """Start the background session cleanup loop."""
+
+    return asyncio.create_task(run_cleanup_loop(), name="session-cleanup-loop")
+
+
+async def stop_session_cleanup_task(task: asyncio.Task | None) -> None:
+    """Cancel and drain the background cleanup task."""
+
+    if task is None:
+        return
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
 
 
 if __name__ == "__main__":

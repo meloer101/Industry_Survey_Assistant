@@ -74,6 +74,21 @@ export async function createSession(
   };
 }
 
+export async function cancelRun(
+  appName: string,
+  userId: string,
+  sessionId: string,
+): Promise<boolean> {
+  const response = await fetch(
+    `/api/apps/${appName}/users/${userId}/sessions/${sessionId}/run`,
+    {
+      method: "DELETE",
+      headers: requestHeaders,
+    },
+  );
+  return response.ok;
+}
+
 export interface SessionEvent {
   author: string;
   content: {

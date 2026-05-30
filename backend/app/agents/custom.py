@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import AsyncGenerator
 
 from google.adk.agents import BaseAgent
@@ -11,6 +10,13 @@ from google.adk.agents.callback_context import CallbackContext
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event, EventActions
 
+from ..observability import (
+    end_pipeline_trace,
+    metrics_registry,
+    now,
+    record_pipeline_failure,
+    start_pipeline_trace,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +55,7 @@ class PipelineGuard(BaseAgent):
         except asyncio.CancelledError:
             logger.warning("[PipelineGuard] Pipeline cancelled during shutdown")
             state = ctx.session.state
+            record_pipeline_failure(state)
             partial_report = self._build_partial_report(
                 state,
                 RuntimeError("Pipeline cancelled during shutdown"),
@@ -64,6 +71,7 @@ class PipelineGuard(BaseAgent):
         except Exception as exc:
             logger.error("[PipelineGuard] Pipeline failed: %s", exc, exc_info=True)
             state = ctx.session.state
+            record_pipeline_failure(state)
             partial_report = self._build_partial_report(state, exc)
             state["final_cited_report"] = partial_report
             state["final_report_with_citations"] = partial_report
@@ -101,7 +109,8 @@ class PipelineGuard(BaseAgent):
 
 
 def pipeline_start_callback(callback_context: CallbackContext) -> None:
-    callback_context.state["_pipeline_start_ts"] = time.time()
+    callback_context.state["_pipeline_start_ts"] = now()
+    start_pipeline_trace(callback_context.state)
     logger.info("[pipeline] research_pipeline started")
 
 
@@ -110,8 +119,17 @@ def pipeline_end_callback(callback_context: CallbackContext) -> None:
     if not start:
         return
 
-    elapsed = time.time() - float(start)
+    elapsed = now() - float(start)
     source_count = len(callback_context.state.get("sources", {}))
+    metrics_registry.record_pipeline_end(
+        duration_seconds=elapsed,
+        source_count=source_count,
+    )
+    end_pipeline_trace(
+        callback_context.state,
+        elapsed_seconds=elapsed,
+        source_count=source_count,
+    )
     logger.info(
         "[pipeline] research_pipeline finished in %.1fs, sources=%d",
         elapsed,

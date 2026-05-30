@@ -5,15 +5,20 @@ import logging
 import os
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .logging_config import RequestIdContext, configure_logging
+from .observability import metrics_registry
 from .persistence import get_session_db_url, get_sqlite_path_from_url, list_research_history
+from .run_control import RunCancellationMiddleware, RunKey, active_run_registry
+from .tools.session_cleanup import start_session_cleanup_task, stop_session_cleanup_task
 
 load_dotenv(Path(__file__).parent / ".env")
 configure_logging()
@@ -25,7 +30,7 @@ API_KEY_HEADER_NAME = "X-API-Key"
 COOKIE_AUTH_SUPPORTED = False
 
 # Paths that bypass API key auth (health checks, API docs)
-_EXEMPT_PREFIXES = ("/health", "/docs", "/redoc", "/openapi.json")
+_EXEMPT_PREFIXES = ("/health", "/metrics", "/docs", "/redoc", "/openapi.json")
 
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):
@@ -79,6 +84,7 @@ def create_app():
 
     # Auth middleware is added after CORS so that preflight OPTIONS requests
     # are handled by CORS before reaching the auth check.
+    fast_api_app.add_middleware(RunCancellationMiddleware)
     fast_api_app.add_middleware(ApiKeyMiddleware)
     fast_api_app.add_middleware(RequestIdMiddleware)
 
@@ -97,6 +103,23 @@ def create_app():
             }
         )
 
+    @fast_api_app.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        return Response(
+            content=metrics_registry.render_prometheus(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
+
+    @fast_api_app.delete(
+        "/apps/{app_name}/users/{user_id}/sessions/{session_id}/run",
+        include_in_schema=True,
+    )
+    async def cancel_run(app_name: str, user_id: str, session_id: str) -> JSONResponse:
+        result = active_run_registry.cancel(
+            RunKey(app_name=app_name, user_id=user_id, session_id=session_id)
+        )
+        return JSONResponse(result, status_code=202 if result["cancelled"] else 404)
+
     @fast_api_app.get("/history/{user_id}", include_in_schema=True)
     async def history(user_id: str) -> JSONResponse:
         db_path = get_sqlite_path_from_url()
@@ -106,7 +129,28 @@ def create_app():
         sessions = list_research_history(db_path=db_path, user_id=user_id, limit=20)
         return JSONResponse({"sessions": sessions})
 
+    install_session_cleanup_lifespan(fast_api_app)
+
     return fast_api_app
+
+
+def install_session_cleanup_lifespan(fast_api_app) -> None:
+    """Wrap the existing app lifespan with session cleanup startup/shutdown."""
+
+    existing_lifespan = fast_api_app.router.lifespan_context
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with existing_lifespan(app):
+            app.state.session_cleanup_task = start_session_cleanup_task()
+            try:
+                yield
+            finally:
+                await stop_session_cleanup_task(
+                    getattr(app.state, "session_cleanup_task", None)
+                )
+
+    fast_api_app.router.lifespan_context = lifespan
 
 
 app = create_app()

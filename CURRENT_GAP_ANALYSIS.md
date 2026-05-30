@@ -30,6 +30,10 @@
 | `_latest_fedfunds()` 阻塞风险 | ✅ 已修复 | FRED 获取已包入 `ThreadPoolExecutor` 并支持超时 |
 | CSRF 保护边界不明确 | ✅ 已修复 | API key 认证明确为 header-only，不接受 cookie auth |
 | `agent.py` 日期在模块加载时固化 | ✅ 已修复 | planner instruction 改为 callable，每次模型请求动态生成当前日期 |
+| 前端取消不通知后端 | ✅ 已修复 | 前端 Cancel 调用后端 DELETE run endpoint，后端取消活跃 `/run_sse` task |
+| Session 清理无自动调度 | ✅ 已修复 | FastAPI startup/shutdown 注册后台 session cleanup loop |
+| 无 metrics 采集 | ✅ 已修复 | `/metrics` 暴露 Prometheus 文本格式 pipeline metrics |
+| 无分布式 tracing | ✅ 已修复 | pipeline callbacks 生成 trace id 并创建 OpenTelemetry span |
 
 ---
 
@@ -38,29 +42,14 @@
 ### P0 — 安全与稳定性（Critical）
 
 截至 2026-05-30，本文件中列出的 P0 项已全部修复并补充回归测试。
-剩余缺陷从 P1 开始。
+剩余缺陷从 P2 开始。
 
 ---
 
 ### P1 — 可运维性（Major）
 
-#### 4. 前端取消不通知后端
-- **位置：** [`frontend/src/App.tsx:304`](frontend/src/App.tsx)
-- **问题：** `handleCancel` 只 abort SSE 连接 + 清空前端状态，后端 pipeline 仍在运行，继续消耗 LLM token。
-- **修复方向：** 后端增加 `DELETE /api/apps/{app}/users/{user}/sessions/{session}/run` 取消端点，前端 cancel 时调用。
-
-#### 5. Session 清理无自动调度
-- **位置：** [`backend/app/tools/session_cleanup.py`](backend/app/tools/session_cleanup.py)
-- **问题：** 清理脚本只能手动 `python -m` 运行，长期运行的服务不会自动清理过期 session，存在 OOM 风险。
-- **修复方向：** 在 FastAPI `lifespan` 事件中启动后台 `asyncio.create_task` 定时任务（如每天凌晨执行一次）。
-
-#### 6. 无 metrics 采集
-- **问题：** `pipeline_end_callback` 只写日志，没有结构化 metric（如 Prometheus counter/histogram）。无法监控 pipeline 耗时、LLM token usage、tool 成功率等指标。
-- **修复方向：** 集成 `prometheus_client`，在 pipeline callbacks 中 `observe()` 耗时和计数。
-
-#### 7. 无分布式 tracing
-- **问题：** 无法追踪单次 research 请求穿过 6+ agents 的完整调用链，排查慢请求时只能看日志。
-- **修复方向：** 集成 OpenTelemetry，或利用 ADK 内置 tracing 支持。
+截至 2026-05-30，本文件中列出的 P1 项已全部修复并补充回归测试。
+剩余缺陷从 P2 开始。
 
 ---
 
@@ -121,10 +110,11 @@ P0（已于 2026-05-30 修复）:
   ├── API Key header-only 安全边界文档化
   └── agent.py 日期固化问题（动态注入）
 
-P1（近期修复）:
-  ├── session_cleanup 自动调度（lifespan 后台任务）
-  ├── CI 添加 ruff linter
-  └── 前端取消通知后端
+P1（已于 2026-05-30 修复）:
+  ├── 前端取消通知后端并取消活跃 run_sse task
+  ├── session_cleanup 自动调度（startup/shutdown 后台任务）
+  ├── /metrics pipeline 指标
+  └── pipeline trace id + OpenTelemetry span
 
 P2（工程优化）:
   ├── TavilyClient 单例缓存
