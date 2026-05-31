@@ -25,7 +25,16 @@ import { devWarn } from "@/lib/logging";
 type DisplayData = string | null;
 
 export default function App() {
-  const [userId, setUserId] = useState<string | null>(() => localStorage.getItem(USER_ID_STORAGE_KEY));
+  const [userId, setUserId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlUserId = params.get("userId");
+    if (urlUserId) {
+      localStorage.setItem(USER_ID_STORAGE_KEY, urlUserId);
+      window.history.replaceState({}, "", window.location.pathname);
+      return urlUserId;
+    }
+    return localStorage.getItem(USER_ID_STORAGE_KEY);
+  });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [appName, setAppName] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageWithAgent[]>([]);

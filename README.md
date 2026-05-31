@@ -85,8 +85,47 @@ graph TD
 
 ## 功能演示
 
-<!-- 在此处添加项目截图或 GIF 录屏 -->
-<!-- 建议截图：1) 产品主页（/ 路由，Agent 星座图）  2) 研究计划审批  3) 研究过程实时流  4) 最终报告含引用 -->
+### 产品主页
+
+> 暗色主题落地页，Agent 星座图实时动画展示 8 个专业化 Agent 的协作关系。
+
+![主页 Hero](README%20Image/01-landing-hero.png)
+
+![功能特性](README%20Image/02-landing-features.png)
+
+![五步工作流](README%20Image/03-landing-workflow.png)
+
+---
+
+### Human-in-the-Loop 计划审批
+
+> AI 生成结构化研究计划，用户逐项审阅后确认执行，确保研究方向完全可控。
+
+![HITL 研究计划审批](README%20Image/04-hitl-plan-approval.png)
+
+---
+
+### 实时研究过程
+
+> SSE 流式传输将每一步 Agent 动作实时推送到前端——包括 Tavily 搜索调用、工具入参与返回结果。
+
+![网络研究阶段](README%20Image/05-research-in-progress.png)
+
+![金融分析协调路由](README%20Image/06-financial-analysis-routing.png)
+
+---
+
+### 最终报告与分析面板
+
+> 三栏标签页：完整研究报告（含可点击引用链接）、宏观分析、风险评估，支持一键导出 Markdown。
+
+![最终报告（含引用）](README%20Image/07-final-report.png)
+
+![宏观经济政策分析](README%20Image/08-analysis-macro.png)
+
+![风险评估报告](README%20Image/09-analysis-risk.png)
+
+---
 
 **示例研究主题：**
 - 美联储 2025 年降息路径分析及对美债市场的影响
