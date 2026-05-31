@@ -6,7 +6,6 @@ body in a background task which deadlocks streaming endpoints like /run_sse.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time

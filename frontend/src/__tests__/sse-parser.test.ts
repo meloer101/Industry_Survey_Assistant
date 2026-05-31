@@ -142,29 +142,29 @@ describe("extractDataFromSSE", () => {
 
 describe("getEventTitle", () => {
   it("maps known agent names to titles", () => {
-    expect(getEventTitle("plan_generator")).toBe("Planning Research Strategy");
-    expect(getEventTitle("section_researcher")).toBe("Initial Web Research");
-    expect(getEventTitle("macro_analysis_agent")).toBe("Macro Policy Analysis");
-    expect(getEventTitle("risk_analysis_agent")).toBe("Risk Assessment");
+    expect(getEventTitle("plan_generator")).toBe("生成研究策略");
+    expect(getEventTitle("section_researcher")).toBe("初步网络搜索");
+    expect(getEventTitle("macro_analysis_agent")).toBe("宏观政策分析");
+    expect(getEventTitle("risk_analysis_agent")).toBe("风险评估");
   });
 
   it("returns fallback for unknown agents", () => {
-    expect(getEventTitle("custom_agent")).toBe("Processing (custom_agent)");
+    expect(getEventTitle("custom_agent")).toBe("处理中（custom_agent）");
   });
 
   it("handles empty agent name", () => {
-    expect(getEventTitle("")).toBe("Processing (Unknown Agent)");
+    expect(getEventTitle("")).toBe("处理中（未知代理）");
   });
 });
 
 describe("getFunctionTitle", () => {
   it("formats known function calls", () => {
-    expect(getFunctionTitle("macro_analysis_agent", "call")).toBe("▶ Macro Policy Analysis");
-    expect(getFunctionTitle("macro_analysis_agent", "response")).toBe("✓ Macro Policy Analysis");
+    expect(getFunctionTitle("macro_analysis_agent", "call")).toBe("▶ 宏观政策分析");
+    expect(getFunctionTitle("macro_analysis_agent", "response")).toBe("✓ 宏观政策分析");
   });
 
   it("formats unknown function calls", () => {
-    expect(getFunctionTitle("some_tool", "call")).toBe("Function Call: some_tool");
-    expect(getFunctionTitle("some_tool", "response")).toBe("Function Response: some_tool");
+    expect(getFunctionTitle("some_tool", "call")).toBe("▶ 函数调用：some_tool");
+    expect(getFunctionTitle("some_tool", "response")).toBe("✓ 函数响应：some_tool");
   });
 });
