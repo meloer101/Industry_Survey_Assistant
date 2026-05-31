@@ -1,6 +1,6 @@
 import type React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Copy, CopyCheck, PlusCircle } from "lucide-react";
+import { Copy, CopyCheck, PlusCircle } from "lucide-react";
 import { InputForm } from "@/components/InputForm";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -282,22 +282,6 @@ export function ChatMessagesView({
               );
             })}
 
-            {isLoading && !lastAiMessage && messages.some(m => m.type === 'human') && (
-              <div className="flex justify-start">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">思考中...</span>
-                </div>
-              </div>
-            )}
-            {isLoading && messages.length > 0 && messages[messages.length - 1].type === 'human' && (
-              <div className="flex justify-start pl-2">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">思考中...</span>
-                </div>
-              </div>
-            )}
           </div>
         </ScrollArea>
       </div>
