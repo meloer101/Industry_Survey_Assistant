@@ -1,6 +1,6 @@
 import type React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Copy, CopyCheck } from "lucide-react";
+import { Loader2, Copy, CopyCheck, PlusCircle } from "lucide-react";
 import { InputForm } from "@/components/InputForm";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -212,9 +212,10 @@ export function ChatMessagesView({
             onClick={handleNewChatClick}
             variant="outline"
             size="sm"
-            className="text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900 text-sm"
+            className="text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900 text-sm flex items-center gap-1.5"
           >
-            新对话
+            <PlusCircle className="h-3.5 w-3.5" />
+            新建研究
           </Button>
         </div>
       </div>

@@ -18,6 +18,7 @@ import {
   requestHeaders,
   USER_ID_STORAGE_KEY,
 } from "@/lib/api";
+import { UI } from "@/lib/strings";
 import { devWarn } from "@/lib/logging";
 
 type DisplayData = string | null;
@@ -103,7 +104,7 @@ export default function App() {
 
     if (sources) {
       setMessageEvents(prev => new Map(prev).set(aiMessageId, [...(prev.get(aiMessageId) || []), {
-        title: "Retrieved Sources", data: { type: 'sources' as const, content: sources as Record<string, { title: string; url: string }> }
+        title: UI.retrievedSources, data: { type: 'sources' as const, content: sources as Record<string, { title: string; url: string }> }
       }]));
     }
 
@@ -260,7 +261,7 @@ export default function App() {
       const aiMessageId = Date.now().toString() + "_ai_error";
       setMessages(prev => [...prev, {
         type: "ai",
-        content: `Sorry, there was an error processing your request: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: UI.errorProcessingRequest(error instanceof Error ? error.message : UI.unknownError),
         id: aiMessageId
       }]);
       setIsLoading(false);
@@ -391,6 +392,7 @@ export default function App() {
         refreshKey={historyRefreshKey}
         onToggle={() => setIsHistoryOpen(prev => !prev)}
         onSelectSession={handleSelectHistorySession}
+        onNewResearch={handleNewResearch}
       />
       <main className="flex-1 flex flex-col overflow-hidden w-full">
         <div className={`flex-1 overflow-y-auto ${(messages.length === 0 || isCheckingBackend) ? "flex" : ""}`}>

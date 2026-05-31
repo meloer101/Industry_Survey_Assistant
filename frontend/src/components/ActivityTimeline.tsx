@@ -4,6 +4,7 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
+import { UI } from "@/lib/strings";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Loader2,
@@ -34,12 +35,10 @@ interface ActivityTimelineProps {
 type EventCategory = 'research' | 'analysis' | 'other';
 
 const ANALYSIS_KEYWORDS = [
-  'Financial Analysis', 'Macro', 'Fundamental',
-  'Risk Assessment', 'Coordinating',
+  '金融分析', '宏观', '基本面', '风险评估', '协调',
 ];
 const RESEARCH_KEYWORDS = [
-  'Research', 'Planning', 'Structuring',
-  'Evaluating', 'Quality', 'Web Research', 'Refining',
+  '搜索', '规划', '大纲', '评估', '质量', '研究', '精炼',
 ];
 
 function getEventCategory(title: string): EventCategory {
@@ -80,16 +79,16 @@ export function ActivityTimeline({
   const formatEventData = (data: SseEventData): string => {
     switch (data.type) {
       case 'functionCall':
-        return `Calling function: ${data.name}\nArguments: ${JSON.stringify(data.args, null, 2)}`;
+        return `${UI.callingFunction(data.name)}\n${UI.functionArgs}：${JSON.stringify(data.args, null, 2)}`;
       case 'functionResponse':
-        return `Function ${data.name} response:\n${JSON.stringify(data.response, null, 2)}`;
+        return `${UI.functionResponseLabel(data.name)}：\n${JSON.stringify(data.response, null, 2)}`;
       case 'text':
         return data.content;
       case 'sources': {
         const sources = data.content;
-        if (Object.keys(sources).length === 0) return "No sources found.";
+        if (Object.keys(sources).length === 0) return UI.noSourcesFound;
         return Object.values(sources)
-          .map(source => `[${source.title || 'Untitled Source'}](${source.url})`).join(', ');
+          .map(source => `[${source.title || UI.untitledSource}](${source.url})`).join(', ');
       }
     }
   };
@@ -99,27 +98,27 @@ export function ActivityTimeline({
   };
 
   const getEventIcon = (title: string) => {
-    if (title.toLowerCase().includes("function call")) {
+    if (title.includes("函数调用")) {
       return <Activity className="h-3.5 w-3.5 text-white" />;
-    } else if (title.toLowerCase().includes("function response")) {
+    } else if (title.includes("函数响应")) {
       return <Activity className="h-3.5 w-3.5 text-white" />;
-    } else if (title.includes("Macro")) {
+    } else if (title.includes("宏观")) {
       return <TrendingUp className="h-3.5 w-3.5 text-white" />;
-    } else if (title.includes("Fundamental")) {
+    } else if (title.includes("基本面")) {
       return <BarChart3 className="h-3.5 w-3.5 text-white" />;
-    } else if (title.includes("Risk")) {
+    } else if (title.includes("风险")) {
       return <Shield className="h-3.5 w-3.5 text-white" />;
-    } else if (title.includes("Coordinating")) {
+    } else if (title.includes("协调")) {
       return <GitBranch className="h-3.5 w-3.5 text-white" />;
-    } else if (title.toLowerCase().includes("research")) {
+    } else if (title.includes("搜索") || title.includes("研究")) {
       return <Search className="h-3.5 w-3.5 text-white" />;
-    } else if (title.toLowerCase().includes("generating")) {
+    } else if (title.includes("策略") || title.includes("生成")) {
       return <TextSearch className="h-3.5 w-3.5 text-white" />;
-    } else if (title.toLowerCase().includes("thinking") || title.toLowerCase().includes("refin")) {
+    } else if (title.includes("精炼") || title.includes("质量") || title.includes("评估")) {
       return <Brain className="h-3.5 w-3.5 text-white" />;
-    } else if (title.toLowerCase().includes("finalizing") || title.toLowerCase().includes("structur")) {
+    } else if (title.includes("大纲") || title.includes("规划")) {
       return <Pen className="h-3.5 w-3.5 text-white" />;
-    } else if (title.toLowerCase().includes("retrieved sources")) {
+    } else if (title.includes("已检索来源")) {
       return <Link className="h-3.5 w-3.5 text-yellow-300" />;
     }
     return <Activity className="h-3.5 w-3.5 text-white" />;

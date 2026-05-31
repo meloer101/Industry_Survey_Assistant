@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock, History, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Clock, History, PanelLeftClose, PanelLeftOpen, PlusCircle } from "lucide-react";
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -19,6 +19,7 @@ interface HistoryPanelProps {
   refreshKey?: number;
   onToggle: () => void;
   onSelectSession: (sessionId: string) => void;
+  onNewResearch?: () => void;
 }
 
 export function HistoryPanel({
@@ -28,6 +29,7 @@ export function HistoryPanel({
   refreshKey,
   onToggle,
   onSelectSession,
+  onNewResearch,
 }: HistoryPanelProps) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,15 +97,28 @@ export function HistoryPanel({
               <span className="truncate">历史研究</span>
             </div>
           )}
-          <button
-            type="button"
-            title={isOpen ? "收起历史记录" : "展开历史记录"}
-            aria-label={isOpen ? "收起历史记录" : "展开历史记录"}
-            onClick={onToggle}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-900"
-          >
-            {isOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
-          </button>
+          <div className="flex items-center gap-1 ml-auto">
+            {isOpen && onNewResearch && (
+              <button
+                type="button"
+                title="新建研究"
+                aria-label="新建研究"
+                onClick={onNewResearch}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-900"
+              >
+                <PlusCircle className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              title={isOpen ? "收起历史记录" : "展开历史记录"}
+              aria-label={isOpen ? "收起历史记录" : "展开历史记录"}
+              onClick={onToggle}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-900"
+            >
+              {isOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
 
         {isOpen && (

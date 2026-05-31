@@ -1,4 +1,5 @@
 import type { AnalysisOutputs } from "@/components/AnalysisPanel";
+import { AGENT_EVENT_TITLES, FUNCTION_FRIENDLY_NAMES, UI } from "@/lib/strings";
 
 interface SsePart {
   text?: string;
@@ -127,51 +128,16 @@ export function extractDataFromSSE(data: string): SseExtractResult {
 }
 
 export function getEventTitle(agentName: string): string {
-  switch (agentName) {
-    case "plan_generator":
-      return "Planning Research Strategy";
-    case "section_planner":
-      return "Structuring Report Outline";
-    case "section_researcher":
-      return "Initial Web Research";
-    case "research_evaluator":
-      return "Evaluating Research Quality";
-    case "EscalationChecker":
-      return "Quality Assessment";
-    case "enhanced_search_executor":
-      return "Enhanced Web Research";
-    case "analysis_coordinator":
-      return "Coordinating Financial Analysis";
-    case "macro_analysis_agent":
-      return "Macro Policy Analysis";
-    case "fundamental_analysis_agent":
-      return "Fundamental Analysis";
-    case "risk_analysis_agent":
-      return "Risk Assessment";
-    case "research_pipeline":
-      return "Executing Research Pipeline";
-    case "iterative_refinement_loop":
-      return "Refining Research";
-    case "interactive_planner_agent":
-    case "root_agent":
-      return "Interactive Planning";
-    default:
-      return `Processing (${agentName || "Unknown Agent"})`;
-  }
+  return AGENT_EVENT_TITLES[agentName] ?? UI.processingAgent(agentName || UI.unknownAgent);
 }
 
 export function getFunctionTitle(
   funcName: string,
   type: "call" | "response",
 ): string {
-  const friendlyNames: Record<string, string> = {
-    macro_analysis_agent: "Macro Policy Analysis",
-    fundamental_analysis_agent: "Fundamental Analysis",
-    risk_analysis_agent: "Risk Assessment",
-  };
-  const prefix = type === "call" ? "▶" : "✓";
-  if (friendlyNames[funcName]) {
-    return `${prefix} ${friendlyNames[funcName]}`;
+  const friendly = FUNCTION_FRIENDLY_NAMES[funcName];
+  if (type === "call") {
+    return friendly ? `▶ ${friendly}` : UI.functionCall(funcName);
   }
-  return `Function ${type === "call" ? "Call" : "Response"}: ${funcName}`;
+  return friendly ? `✓ ${friendly}` : UI.functionResponse(funcName);
 }
