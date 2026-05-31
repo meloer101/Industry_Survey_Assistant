@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatMessagesView } from "@/components/ChatMessagesView";
 import { HistoryPanel } from "@/components/HistoryPanel";
@@ -41,6 +42,8 @@ export default function App() {
   const analysisOutputsRef = useRef<AnalysisOutputs>({});
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const location = useLocation();
+  const autoSubmittedRef = useRef(false);
 
   const processSseEventData = useCallback((jsonData: string, aiMessageId: string) => {
     const { textParts, agent, finalReportWithCitations, functionCall, functionResponse, sourceCount, sources, newAnalysisOutputs } = extractDataFromSSE(jsonData);
@@ -279,6 +282,17 @@ export default function App() {
       }
     }
   }, [messages]);
+
+  // Auto-submit a query passed from the landing page via router state
+  useEffect(() => {
+    const state = location.state as { query?: string } | null;
+    if (state?.query && !autoSubmittedRef.current && isBackendReady) {
+      autoSubmittedRef.current = true;
+      handleSubmit(state.query);
+      // Clear state so a refresh doesn't re-trigger
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [isBackendReady, location.state, handleSubmit]);
 
   useEffect(() => {
     const checkBackend = async () => {

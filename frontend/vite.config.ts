@@ -9,7 +9,7 @@ const proxyDebug = process.env.VITE_PROXY_DEBUG === "true";
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: "/app/",
+  base: "/",
   resolve: {
     alias: {
       "@": path.resolve(new URL(".", import.meta.url).pathname, "./src"),
