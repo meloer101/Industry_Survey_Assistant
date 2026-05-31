@@ -1,18 +1,23 @@
-"""Custom startup entry point: wraps ADK's FastAPI app with auth + CORS."""
+"""Custom startup entry point: wraps ADK's FastAPI app with auth + CORS.
+
+Middlewares are implemented as pure ASGI (not BaseHTTPMiddleware) to avoid
+blocking SSE StreamingResponse — BaseHTTPMiddleware buffers the response
+body in a background task which deadlocks streaming endpoints like /run_sse.
+"""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any, Awaitable, Callable
 
 from dotenv import load_dotenv
-from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.responses import Response
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from .logging_config import RequestIdContext, configure_logging
 from .observability import metrics_registry
@@ -29,41 +34,72 @@ logger = logging.getLogger(__name__)
 API_KEY_HEADER_NAME = "X-API-Key"
 COOKIE_AUTH_SUPPORTED = False
 
-# Paths that bypass API key auth (health checks, API docs)
 _EXEMPT_PREFIXES = ("/health", "/metrics", "/docs", "/redoc", "/openapi.json")
 
+Receive = Callable[[], Awaitable[dict[str, Any]]]
+Send = Callable[[dict[str, Any]], Awaitable[None]]
+ASGIApp = Callable[[dict[str, Any], Receive, Send], Awaitable[None]]
 
-class ApiKeyMiddleware(BaseHTTPMiddleware):
-    """Require X-API-Key header on all non-exempt routes.
+
+class ApiKeyMiddleware:
+    """Pure-ASGI middleware: require X-API-Key header on non-exempt routes.
 
     When APP_API_KEY is not set, auth is skipped entirely (local dev mode).
     Auth is intentionally header-only: this service does not accept cookies for
     API authentication, keeping browser CSRF out of the current threat model.
     """
 
-    async def dispatch(self, request: Request, call_next):
-        if not APP_API_KEY:
-            return await call_next(request)
-        path = request.url.path
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http" or not APP_API_KEY:
+            await self.app(scope, receive, send)
+            return
+
+        path: str = scope.get("path", "")
         if any(path.startswith(p) for p in _EXEMPT_PREFIXES):
-            return await call_next(request)
-        if request.headers.get(API_KEY_HEADER_NAME, "") != APP_API_KEY:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or missing API key",
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        api_key = headers.get(API_KEY_HEADER_NAME.lower().encode(), b"").decode()
+        if api_key != APP_API_KEY:
+            response = JSONResponse(
+                {"detail": "Invalid or missing API key"},
+                status_code=401,
             )
-        return await call_next(request)
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
 
 
-class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Assign a request id to every HTTP request and response."""
+class RequestIdMiddleware:
+    """Pure-ASGI middleware: assign a request id to every HTTP request."""
 
-    async def dispatch(self, request: Request, call_next):
-        request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:12]
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        request_id = (
+            headers.get(b"x-request-id", b"").decode() or uuid.uuid4().hex[:12]
+        )
+
+        async def send_with_request_id(message: dict[str, Any]) -> None:
+            if message.get("type") == "http.response.start":
+                resp_headers = list(message.get("headers", []))
+                resp_headers.append((b"x-request-id", request_id.encode()))
+                message = {**message, "headers": resp_headers}
+            await send(message)
+
         with RequestIdContext(request_id):
-            response = await call_next(request)
-        response.headers["X-Request-Id"] = request_id
-        return response
+            await self.app(scope, receive, send_with_request_id)
 
 
 def create_app():

@@ -34,6 +34,7 @@ export default function App() {
   const [isBackendReady, setIsBackendReady] = useState(false);
   const [isCheckingBackend, setIsCheckingBackend] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const currentAgentRef = useRef('');
   const accumulatedTextRef = useRef("");
   const analysisOutputsRef = useRef<AnalysisOutputs>({});
@@ -247,6 +248,7 @@ export default function App() {
       }
 
       setIsLoading(false);
+      setHistoryRefreshKey(k => k + 1);
       abortControllerRef.current = null;
 
     } catch (error) {
@@ -319,6 +321,22 @@ export default function App() {
     analysisOutputsRef.current = {};
   }, [appName, sessionId, userId]);
 
+  const handleNewResearch = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setMessages([]);
+    setDisplayData(null);
+    setMessageEvents(new Map());
+    setWebsiteCount(0);
+    setIsLoading(false);
+    analysisOutputsRef.current = {};
+    // Reset session so next submit creates a fresh one, but keep userId
+    setSessionId(null);
+    setAppName(null);
+    // Refresh history so the just-completed session appears in the sidebar
+    setHistoryRefreshKey(k => k + 1);
+  }, []);
+
   const handleSelectHistorySession = useCallback(async (selectedSessionId: string) => {
     if (!userId) return;
     // Reset current chat state
@@ -370,6 +388,7 @@ export default function App() {
         userId={userId}
         isOpen={isHistoryOpen}
         requestHeaders={requestHeaders}
+        refreshKey={historyRefreshKey}
         onToggle={() => setIsHistoryOpen(prev => !prev)}
         onSelectSession={handleSelectHistorySession}
       />
@@ -405,6 +424,7 @@ export default function App() {
               scrollAreaRef={scrollAreaRef}
               onSubmit={handleSubmit}
               onCancel={handleCancel}
+              onNewResearch={handleNewResearch}
               displayData={displayData}
               messageEvents={messageEvents}
               websiteCount={websiteCount}

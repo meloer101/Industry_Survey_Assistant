@@ -1,6 +1,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Download } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { analysisMdComponents } from "@/lib/markdown";
 
 export interface AnalysisOutputs {
@@ -12,6 +14,21 @@ export interface AnalysisOutputs {
 interface AnalysisPanelProps {
   report: string;
   analysisOutputs: AnalysisOutputs;
+  onExportMarkdown?: () => void;
+}
+
+function ExportButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      className="flex-shrink-0 flex items-center gap-1.5 text-xs text-gray-500 border-gray-200 hover:text-gray-800 hover:border-gray-300"
+    >
+      <Download className="h-3.5 w-3.5" />
+      导出 Markdown
+    </Button>
+  );
 }
 
 function MarkdownContent({ content }: { content: string }) {
@@ -24,7 +41,7 @@ function MarkdownContent({ content }: { content: string }) {
   );
 }
 
-export function AnalysisPanel({ report, analysisOutputs }: AnalysisPanelProps) {
+export function AnalysisPanel({ report, analysisOutputs, onExportMarkdown }: AnalysisPanelProps) {
   const hasMacro = Boolean(analysisOutputs.macro);
   const hasFundamental = Boolean(analysisOutputs.fundamental);
   const hasRisk = Boolean(analysisOutputs.risk);
@@ -33,6 +50,11 @@ export function AnalysisPanel({ report, analysisOutputs }: AnalysisPanelProps) {
   if (!hasAnyAnalysis) {
     return (
       <div className="mt-4">
+        {onExportMarkdown && (
+          <div className="flex justify-end mb-2">
+            <ExportButton onClick={onExportMarkdown} />
+          </div>
+        )}
         <MarkdownContent content={report} />
       </div>
     );
@@ -41,7 +63,8 @@ export function AnalysisPanel({ report, analysisOutputs }: AnalysisPanelProps) {
   return (
     <div className="mt-4">
       <Tabs defaultValue="report">
-        <TabsList className="bg-gray-100 border border-gray-200 mb-4 flex-wrap h-auto gap-1 p-1 rounded-lg">
+        <div className="flex items-start justify-between mb-4 gap-2">
+        <TabsList className="bg-gray-100 border border-gray-200 flex-wrap h-auto gap-1 p-1 rounded-lg">
           <TabsTrigger
             value="report"
             className="text-xs data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-500"
@@ -73,6 +96,8 @@ export function AnalysisPanel({ report, analysisOutputs }: AnalysisPanelProps) {
             </TabsTrigger>
           )}
         </TabsList>
+        {onExportMarkdown && <ExportButton onClick={onExportMarkdown} />}
+        </div>
 
         <TabsContent value="report">
           <MarkdownContent content={report} />

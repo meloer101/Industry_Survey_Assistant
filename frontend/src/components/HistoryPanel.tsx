@@ -15,6 +15,8 @@ interface HistoryPanelProps {
   userId: string | null;
   isOpen: boolean;
   requestHeaders: Record<string, string>;
+  /** Increment to force a re-fetch (e.g. after a session completes or user starts a new chat). */
+  refreshKey?: number;
   onToggle: () => void;
   onSelectSession: (sessionId: string) => void;
 }
@@ -23,6 +25,7 @@ export function HistoryPanel({
   userId,
   isOpen,
   requestHeaders,
+  refreshKey,
   onToggle,
   onSelectSession,
 }: HistoryPanelProps) {
@@ -57,7 +60,7 @@ export function HistoryPanel({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, requestHeaders, userId]);
+  }, [isOpen, requestHeaders, userId, refreshKey]);
 
   const loadMore = async () => {
     if (!userId || isLoadingMore) return;

@@ -75,7 +75,10 @@ class RunCancellationMiddleware:
         if key and task:
             self.registry.register(key, task)
         try:
-            await self.app(scope, self._replay_receive(messages), send)
+            # Pass the original `receive` so that Starlette's
+            # StreamingResponse can still await http.disconnect events
+            # after the request body has been consumed.
+            await self.app(scope, self._replay_receive(messages, receive), send)
         finally:
             if key and task:
                 self.registry.unregister(key, task)
@@ -90,13 +93,17 @@ class RunCancellationMiddleware:
                 return messages
 
     @staticmethod
-    def _replay_receive(messages: list[dict[str, Any]]) -> Receive:
+    def _replay_receive(
+        messages: list[dict[str, Any]], original_receive: Receive
+    ) -> Receive:
         pending = list(messages)
 
         async def receive() -> dict[str, Any]:
             if pending:
                 return pending.pop(0)
-            return {"type": "http.request", "body": b"", "more_body": False}
+            # After replaying the buffered body, fall through to the
+            # original receive so http.disconnect events are delivered.
+            return await original_receive()
 
         return receive
 

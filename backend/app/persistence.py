@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_SESSION_DB_PATH = Path(__file__).parent / ".adk" / "session.db"
+# Place the DB outside the backend source tree so uvicorn --reload does not
+# treat session writes as code changes and restart mid-request.
+DEFAULT_SESSION_DB_PATH = Path(__file__).parent.parent.parent / ".adk" / "session.db"
 DEFAULT_SESSION_DB_URL = f"sqlite:///{DEFAULT_SESSION_DB_PATH}"
 
 
