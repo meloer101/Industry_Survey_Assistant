@@ -48,24 +48,24 @@ function getEventCategory(title: string): EventCategory {
 }
 
 const CATEGORY_STYLES: Record<EventCategory, {
-  dot: string;
+  dotStyle: React.CSSProperties;
   ring: string;
-  line: string;
+  lineStyle: React.CSSProperties;
 }> = {
   research: {
-    dot: 'bg-blue-500',
-    ring: 'ring-blue-100',
-    line: 'bg-blue-200',
+    dotStyle: { backgroundColor: 'var(--app-navy-light, #1a2a44)' },
+    ring: 'ring-[var(--app-warm-200)]',
+    lineStyle: { backgroundColor: 'var(--app-warm-300, #d5cfc4)' },
   },
   analysis: {
-    dot: 'bg-amber-500',
-    ring: 'ring-amber-100',
-    line: 'bg-amber-200',
+    dotStyle: { backgroundColor: 'var(--app-gold, #c9a35e)' },
+    ring: 'ring-[var(--app-gold-bg)]',
+    lineStyle: { backgroundColor: 'var(--app-gold-ring, rgba(201,163,94,0.25))' },
   },
   other: {
-    dot: 'bg-gray-400',
-    ring: 'ring-gray-100',
-    line: 'bg-gray-200',
+    dotStyle: { backgroundColor: 'var(--app-warm-400, #a39e93)' },
+    ring: 'ring-[var(--app-warm-100)]',
+    lineStyle: { backgroundColor: 'var(--app-warm-200, #e8e4dd)' },
   },
 };
 
@@ -133,31 +133,33 @@ export function ActivityTimeline({
   const hasAnalysis = processedEvents.some(e => getEventCategory(e.title) === 'analysis');
 
   return (
-    <Card className={`rounded-xl border border-gray-200 bg-white shadow-sm ${isTimelineCollapsed ? "h-10 py-2" : "max-h-[28rem] py-2"}`}>
+    <Card className={`rounded-xl border border-[var(--app-warm-200)] bg-white shadow-sm ${isTimelineCollapsed ? "h-10 py-2" : "max-h-[28rem] py-2"}`}
+          style={{ fontFamily: 'var(--app-font-body)' }}>
       <CardHeader className="py-0">
         <CardDescription className="flex items-center justify-between">
           <div
-            className="flex items-center justify-start text-sm w-full cursor-pointer gap-2 text-gray-700"
+            className="flex items-center justify-start text-sm w-full cursor-pointer gap-2 text-[var(--app-warm-700)]"
             onClick={() => setIsTimelineCollapsed(!isTimelineCollapsed)}
           >
-            <span className="font-medium">研究进程</span>
+            <span className="font-medium" style={{ fontFamily: 'var(--app-font-display)' }}>研究进程</span>
             {websiteCount > 0 && (
-              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full border border-gray-200">
+              <span className="text-xs bg-[var(--app-warm-100)] text-[var(--app-warm-500)] px-2 py-0.5 rounded-full border border-[var(--app-warm-200)]"
+                    style={{ fontFamily: 'var(--app-font-mono)' }}>
                 {websiteCount} 个来源
               </span>
             )}
             {hasAnalysis && (
-              <span className="text-xs flex items-center gap-1 text-gray-500">
-                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+              <span className="text-xs flex items-center gap-1 text-[var(--app-warm-500)]">
+                <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: 'var(--app-navy-light)' }} />
                 研究
-                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block ml-1" />
+                <span className="w-2 h-2 rounded-full inline-block ml-1" style={{ backgroundColor: 'var(--app-gold)' }} />
                 分析
               </span>
             )}
             {isTimelineCollapsed ? (
-              <ChevronDown className="h-4 w-4 ml-auto text-gray-400" />
+              <ChevronDown className="h-4 w-4 ml-auto text-[var(--app-warm-400)]" />
             ) : (
-              <ChevronUp className="h-4 w-4 ml-auto text-gray-400" />
+              <ChevronUp className="h-4 w-4 ml-auto text-[var(--app-warm-400)]" />
             )}
           </div>
         </CardDescription>
@@ -167,11 +169,11 @@ export function ActivityTimeline({
           <CardContent>
             {isLoading && processedEvents.length === 0 && (
               <div className="relative pl-8 pb-4">
-                <div className="absolute left-3 top-3.5 h-full w-0.5 bg-gray-200" />
-                <div className="absolute left-0.5 top-2 h-5 w-5 rounded-full bg-gray-200 flex items-center justify-center ring-4 ring-white">
-                  <Loader2 className="h-3 w-3 text-gray-400 animate-spin" />
+                <div className="absolute left-3 top-3.5 h-full w-0.5" style={{ backgroundColor: 'var(--app-warm-200)' }} />
+                <div className="absolute left-0.5 top-2 h-5 w-5 rounded-full flex items-center justify-center ring-4 ring-white" style={{ backgroundColor: 'var(--app-warm-200)' }}>
+                  <Loader2 className="h-3 w-3 animate-spin" style={{ color: 'var(--app-warm-400)' }} />
                 </div>
-                <p className="text-sm text-gray-500 font-medium">思考中...</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--app-warm-500)' }}>思考中...</p>
               </div>
             )}
             {processedEvents.length > 0 ? (
@@ -182,24 +184,25 @@ export function ActivityTimeline({
                   const nextCategory = index < processedEvents.length - 1
                     ? getEventCategory(processedEvents[index + 1].title)
                     : null;
-                  const lineColor = nextCategory ? CATEGORY_STYLES[nextCategory].line : styles.line;
+                  const lineStyle = nextCategory ? CATEGORY_STYLES[nextCategory].lineStyle : styles.lineStyle;
 
                   return (
                     <div key={index} className="relative pl-8 pb-4">
                       {index < processedEvents.length - 1 ||
                       (isLoading && index === processedEvents.length - 1) ? (
-                        <div className={`absolute left-3 top-3.5 h-full w-0.5 ${lineColor}`} />
+                        <div className="absolute left-3 top-3.5 h-full w-0.5" style={lineStyle} />
                       ) : null}
-                      <div className={`absolute left-0.5 top-2 h-6 w-6 rounded-full ${styles.dot} flex items-center justify-center ring-4 ${styles.ring}`}>
+                      <div className={`absolute left-0.5 top-2 h-6 w-6 rounded-full flex items-center justify-center ring-4 ${styles.ring}`} style={styles.dotStyle}>
                         {getEventIcon(eventItem.title)}
                       </div>
                       <div>
-                        <p className="text-sm text-gray-800 font-medium mb-0.5">
+                        <p className="text-sm text-[var(--app-warm-800)] font-medium mb-0.5">
                           {eventItem.title}
                         </p>
-                        <div className="text-xs text-gray-500 leading-relaxed">
+                        <div className="text-xs text-[var(--app-warm-500)] leading-relaxed">
                           {isJsonData(eventItem.data) ? (
-                            <pre className="bg-gray-50 border border-gray-200 p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap text-gray-600">
+                            <pre className="bg-[var(--app-warm-50)] border border-[var(--app-warm-200)] p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap text-[var(--app-warm-600)]"
+                                 style={{ fontFamily: 'var(--app-font-mono)' }}>
                               {formatEventData(eventItem.data)}
                             </pre>
                           ) : (
@@ -211,13 +214,15 @@ export function ActivityTimeline({
                                     href={href}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-500 hover:text-blue-600 underline"
+                                    className="underline"
+                                    style={{ color: 'var(--app-gold-dim)' }}
                                   >
                                     {children}
                                   </a>
                                 ),
                                 code: ({ children }) => (
-                                  <code className="bg-gray-100 px-1 py-0.5 rounded text-xs text-gray-700">
+                                  <code className="bg-[var(--app-warm-100)] px-1 py-0.5 rounded text-xs text-[var(--app-warm-700)]"
+                                        style={{ fontFamily: 'var(--app-font-mono)' }}>
                                     {children}
                                   </code>
                                 ),
@@ -233,18 +238,18 @@ export function ActivityTimeline({
                 })}
                 {isLoading && processedEvents.length > 0 && (
                   <div className="relative pl-8 pb-4">
-                    <div className="absolute left-0.5 top-2 h-5 w-5 rounded-full bg-gray-200 flex items-center justify-center ring-4 ring-white">
-                      <Loader2 className="h-3 w-3 text-gray-400 animate-spin" />
+                    <div className="absolute left-0.5 top-2 h-5 w-5 rounded-full flex items-center justify-center ring-4 ring-white" style={{ backgroundColor: 'var(--app-warm-200)' }}>
+                      <Loader2 className="h-3 w-3 animate-spin" style={{ color: 'var(--app-warm-400)' }} />
                     </div>
-                    <p className="text-sm text-gray-500 font-medium">思考中...</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--app-warm-500)' }}>思考中...</p>
                   </div>
                 )}
               </div>
             ) : !isLoading ? (
-              <div className="flex flex-col items-center justify-center h-full text-gray-400 pt-10">
+              <div className="flex flex-col items-center justify-center h-full pt-10" style={{ color: 'var(--app-warm-400)' }}>
                 <Info className="h-6 w-6 mb-3" />
                 <p className="text-sm">暂无活动记录</p>
-                <p className="text-xs text-gray-300 mt-1">处理过程中将实时更新。</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--app-warm-300)' }}>处理过程中将实时更新。</p>
               </div>
             ) : null}
           </CardContent>

@@ -18,7 +18,7 @@ interface HumanMessageBubbleProps {
 
 const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({ message }) => {
   return (
-    <div className="text-gray-900 rounded-2xl break-words min-h-7 bg-gray-100 max-w-[85%] sm:max-w-[80%] px-4 pt-3 pb-2 rounded-br-sm">
+    <div className="text-[var(--app-warm-900)] rounded-2xl break-words min-h-7 bg-[var(--app-warm-100)] max-w-[85%] sm:max-w-[80%] px-4 pt-3 pb-2 rounded-br-sm">
       <ReactMarkdown components={mdComponents} remarkPlugins={[remarkGfm]}>
         {message.content}
       </ReactMarkdown>
@@ -201,18 +201,29 @@ export function ChatMessagesView({
   const lastAiMessageId = lastAiMessage?.id;
 
   return (
-    <div className="flex flex-col h-full w-full bg-white">
+    <div className="flex flex-col h-full w-full bg-white" style={{ fontFamily: 'var(--app-font-body)' }}>
       {/* Header */}
-      <div className="border-b border-gray-200 px-4 py-3 bg-white">
+      <div className="border-b border-[var(--app-warm-200)] px-4 py-3 bg-white">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-            📈 <span>AI 投资研究平台</span>
+          <span className="text-sm font-medium text-[var(--app-warm-700)] flex items-center gap-2.5"
+                style={{ fontFamily: 'var(--app-font-display)' }}>
+            <svg className="w-5 h-5" viewBox="0 0 40 40" fill="none">
+              <circle cx="20" cy="20" r="16" stroke="var(--app-gold)" strokeWidth="1.4" opacity="0.55" fill="none"/>
+              <line x1="20" y1="20" x2="20" y2="6" stroke="var(--app-gold)" strokeWidth="1.2" opacity="0.4"/>
+              <line x1="20" y1="20" x2="32" y2="27" stroke="var(--app-gold)" strokeWidth="1.2" opacity="0.4"/>
+              <line x1="20" y1="20" x2="8" y2="27" stroke="var(--app-gold)" strokeWidth="1.2" opacity="0.4"/>
+              <circle cx="20" cy="6" r="2.6" fill="var(--app-gold)"/>
+              <circle cx="32" cy="27" r="2.6" fill="var(--app-gold)"/>
+              <circle cx="8" cy="27" r="2.6" fill="var(--app-gold)"/>
+              <circle cx="20" cy="20" r="3.6" fill="var(--app-gold-light)"/>
+            </svg>
+            <span>Veris <span className="text-[var(--app-warm-400)] font-normal text-xs ml-0.5">维睿</span></span>
           </span>
           <Button
             onClick={handleNewChatClick}
             variant="outline"
             size="sm"
-            className="text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900 text-sm flex items-center gap-1.5"
+            className="text-[var(--app-warm-500)] border-[var(--app-warm-200)] hover:bg-[var(--app-gold-bg)] hover:text-[var(--app-gold-dim)] hover:border-[var(--app-gold)] text-sm flex items-center gap-1.5 transition-all"
           >
             <PlusCircle className="h-3.5 w-3.5" />
             新建研究
@@ -236,7 +247,8 @@ export function ChatMessagesView({
               </Button>
               <Button
                 size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="text-white"
+                style={{ background: 'linear-gradient(180deg, var(--app-gold-light), var(--app-gold))' }}
                 onClick={() => {
                   setShowNewResearchConfirm(false);
                   onCancel();
@@ -251,7 +263,7 @@ export function ChatMessagesView({
       )}
 
       {/* Messages */}
-      <div className="flex-1 flex flex-col w-full bg-gray-50">
+      <div className="flex-1 flex flex-col w-full bg-[var(--app-warm-50)]">
         <ScrollArea ref={scrollAreaRef} className="flex-1 w-full">
           <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
             {messages.map((message) => {
@@ -287,7 +299,7 @@ export function ChatMessagesView({
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 p-4 bg-white w-full">
+      <div className="border-t border-[var(--app-warm-200)] p-4 bg-white w-full">
         <div className="max-w-3xl mx-auto">
           <InputForm onSubmit={onSubmit} isLoading={isLoading} context="chat" />
           {isLoading && (

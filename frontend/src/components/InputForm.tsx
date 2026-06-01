@@ -106,19 +106,19 @@ export function InputForm({ onSubmit, isLoading, context = 'homepage' }: InputFo
           value={ticker}
           onChange={(e) => setTicker(e.target.value)}
           placeholder="股票代码（可选，如 NVDA）"
-          className="w-44 text-sm bg-white border-gray-300 placeholder:text-gray-400 text-gray-900"
+          className="w-44 text-sm bg-white border-[var(--app-warm-300)] placeholder:text-[var(--app-warm-400)] text-[var(--app-warm-900)] focus:border-[var(--app-gold)] focus:ring-[var(--app-gold-ring)]"
           maxLength={10}
         />
         <Select
           value={researchType}
           onValueChange={(v) => setResearchType(v as ResearchType)}
         >
-          <SelectTrigger className="flex-1 bg-white border-gray-300 text-gray-700">
+          <SelectTrigger className="flex-1 bg-white border-[var(--app-warm-300)] text-[var(--app-warm-700)] focus:border-[var(--app-gold)] focus:ring-[var(--app-gold-ring)]">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-white border-gray-200">
+          <SelectContent className="bg-white border-[var(--app-warm-200)]">
             {(Object.keys(RESEARCH_TYPE_LABELS) as ResearchType[]).map((key) => (
-              <SelectItem key={key} value={key} className="text-gray-700 focus:bg-gray-100">
+              <SelectItem key={key} value={key} className="text-[var(--app-warm-700)] focus:bg-[var(--app-warm-100)]">
                 {RESEARCH_TYPE_LABELS[key]}
               </SelectItem>
             ))}

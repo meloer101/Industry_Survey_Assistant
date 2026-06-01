@@ -64,6 +64,8 @@ section is empty, skip it silently.
 
 Legal Disclaimer and User Acknowledgment (MUST be displayed prominently):
 {LEGAL_DISCLAIMER}
+
+**LANGUAGE RULE:** The entire risk report MUST be written in Chinese (简体中文). The legal disclaimer above should be kept in its original English. Technical terms, proper nouns, and data labels may remain in English.
 """
 
 

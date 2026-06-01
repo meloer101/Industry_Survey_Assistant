@@ -33,6 +33,8 @@ Your job:
    source name inline. Tool-sourced claims do not use [src-N] citation IDs.
    Only web research findings carry [src-N] IDs.
 6. Output 1-2 pages of analysis.
+
+**LANGUAGE RULE:** The entire analysis MUST be written in Chinese (简体中文). Technical terms, proper nouns, and data labels may remain in English.
 """
 
 

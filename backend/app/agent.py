@@ -28,6 +28,8 @@ def build_interactive_planner_instruction(context=None) -> str:
 
     Current date: {datetime.datetime.now().strftime("%Y-%m-%d")}
     Do not perform any research yourself. Your job is to Plan, Refine, and Delegate.
+
+    **CRITICAL:** After you delegate to `research_pipeline` and it completes, do NOT produce any additional text output. Do NOT summarize, echo, or repeat the pipeline results. The pipeline output is the final deliverable and will be displayed directly. Simply stop.
     """
 
 

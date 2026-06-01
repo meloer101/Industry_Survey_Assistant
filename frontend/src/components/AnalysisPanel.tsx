@@ -23,7 +23,7 @@ function ExportButton({ onClick }: { onClick: () => void }) {
       variant="outline"
       size="sm"
       onClick={onClick}
-      className="flex-shrink-0 flex items-center gap-1.5 text-xs text-gray-500 border-gray-200 hover:text-gray-800 hover:border-gray-300"
+      className="flex-shrink-0 flex items-center gap-1.5 text-xs text-[var(--app-warm-500)] border-[var(--app-warm-200)] hover:text-[var(--app-gold-dim)] hover:border-[var(--app-gold)] hover:bg-[var(--app-gold-bg)] transition-all"
     >
       <Download className="h-3.5 w-3.5" />
       导出 Markdown
@@ -33,7 +33,7 @@ function ExportButton({ onClick }: { onClick: () => void }) {
 
 function MarkdownContent({ content }: { content: string }) {
   return (
-    <div className="prose max-w-none text-gray-700">
+    <div className="prose max-w-none text-[var(--app-warm-700)]">
       <ReactMarkdown components={analysisMdComponents} remarkPlugins={[remarkGfm]}>
         {content}
       </ReactMarkdown>
@@ -64,17 +64,19 @@ export function AnalysisPanel({ report, analysisOutputs, onExportMarkdown }: Ana
     <div className="mt-4">
       <Tabs defaultValue="report">
         <div className="flex items-start justify-between mb-4 gap-2">
-        <TabsList className="bg-gray-100 border border-gray-200 flex-wrap h-auto gap-1 p-1 rounded-lg">
+        <TabsList className="bg-[var(--app-warm-100)] border border-[var(--app-warm-200)] flex-wrap h-auto gap-1 p-1 rounded-lg">
           <TabsTrigger
             value="report"
-            className="text-xs data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-500"
+            className="text-xs data-[state=active]:bg-white data-[state=active]:text-[var(--app-warm-900)] data-[state=active]:shadow-sm text-[var(--app-warm-500)]"
+            style={{ fontFamily: 'var(--app-font-display)' }}
           >
             📄 完整报告
           </TabsTrigger>
           {hasMacro && (
             <TabsTrigger
               value="macro"
-              className="text-xs data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm text-gray-500"
+              className="text-xs data-[state=active]:bg-white data-[state=active]:text-[var(--app-gold-dim)] data-[state=active]:shadow-sm text-[var(--app-warm-500)]"
+              style={{ fontFamily: 'var(--app-font-display)' }}
             >
               🌐 宏观分析
             </TabsTrigger>
@@ -82,7 +84,8 @@ export function AnalysisPanel({ report, analysisOutputs, onExportMarkdown }: Ana
           {hasFundamental && (
             <TabsTrigger
               value="fundamental"
-              className="text-xs data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm text-gray-500"
+              className="text-xs data-[state=active]:bg-white data-[state=active]:text-[var(--app-gold-dim)] data-[state=active]:shadow-sm text-[var(--app-warm-500)]"
+              style={{ fontFamily: 'var(--app-font-display)' }}
             >
               📊 基本面
             </TabsTrigger>
@@ -90,7 +93,8 @@ export function AnalysisPanel({ report, analysisOutputs, onExportMarkdown }: Ana
           {hasRisk && (
             <TabsTrigger
               value="risk"
-              className="text-xs data-[state=active]:bg-white data-[state=active]:text-amber-600 data-[state=active]:shadow-sm text-gray-500"
+              className="text-xs data-[state=active]:bg-white data-[state=active]:text-amber-600 data-[state=active]:shadow-sm text-[var(--app-warm-500)]"
+              style={{ fontFamily: 'var(--app-font-display)' }}
             >
               🛡️ 风险评估
             </TabsTrigger>
@@ -106,8 +110,8 @@ export function AnalysisPanel({ report, analysisOutputs, onExportMarkdown }: Ana
         {hasMacro && (
           <TabsContent value="macro">
             <div className="mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-              <span className="text-xs text-neutral-400">宏观政策分析</span>
+              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: 'var(--app-gold)' }} />
+              <span className="text-xs text-[var(--app-warm-400)]" style={{ fontFamily: 'var(--app-font-mono)' }}>宏观政策分析</span>
             </div>
             <MarkdownContent content={analysisOutputs.macro!} />
           </TabsContent>
@@ -116,8 +120,8 @@ export function AnalysisPanel({ report, analysisOutputs, onExportMarkdown }: Ana
         {hasFundamental && (
           <TabsContent value="fundamental">
             <div className="mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-              <span className="text-xs text-neutral-400">基本面分析</span>
+              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: 'var(--app-gold)' }} />
+              <span className="text-xs text-[var(--app-warm-400)]" style={{ fontFamily: 'var(--app-font-mono)' }}>基本面分析</span>
             </div>
             <MarkdownContent content={analysisOutputs.fundamental!} />
           </TabsContent>
@@ -127,7 +131,7 @@ export function AnalysisPanel({ report, analysisOutputs, onExportMarkdown }: Ana
           <TabsContent value="risk">
             <div className="mb-3 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
-              <span className="text-xs text-neutral-400">风险评估</span>
+              <span className="text-xs text-[var(--app-warm-400)]" style={{ fontFamily: 'var(--app-font-mono)' }}>风险评估</span>
             </div>
             <MarkdownContent content={analysisOutputs.risk!} />
           </TabsContent>

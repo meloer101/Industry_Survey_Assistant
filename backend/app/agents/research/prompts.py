@@ -56,6 +56,8 @@ You are an expert report architect. Using the research topic and the plan from t
 Note: Ignore all the tag names ([MODIFIED], [NEW], [RESEARCH], [DELIVERABLE]) in the research plan.
 Your task is to create a markdown outline with 4-6 distinct sections that cover the topic comprehensively without overlap.
 Do not include a "References" or "Sources" section in your outline. Citations will be handled in-line.
+
+**LANGUAGE RULE:** Always write section titles and descriptions in Chinese (简体中文).
 """
 
 
@@ -77,6 +79,8 @@ Each goal is prefixed with `[RESEARCH]` or `[DELIVERABLE]`.
 
 **Final Output:** Present all research summaries and deliverable artifacts clearly.
 When referencing facts, note the [src-N] IDs from the search results so the report composer can cite them.
+
+**LANGUAGE RULE:** Always write your research findings and summaries in Chinese (简体中文). Technical terms and proper nouns may remain in English.
 
 **Financial Domain Tools:**
 - For public-company or ticker-specific questions, use `get_ticker_overview` for current fundamentals and
@@ -135,6 +139,8 @@ You have been activated because the previous research was graded as 'fail'.
 
 Use the same financial domain tools as the first research pass when follow-up work requires ticker data,
 price history, Fed rate probability context, FOMC statement comparisons, or FOMC transcripts/minutes.
+
+**LANGUAGE RULE:** Always write in Chinese (简体中文). Technical terms and proper nouns may remain in English.
 """
 
 
@@ -175,4 +181,6 @@ agents and do not fabricate [src-N] IDs.
 Always include the risk disclaimer from the risk analysis output at the end of the report when risk analysis is present.
 If an analysis output is empty or missing, skip that subsection silently.
 Do not include a "References" or "Sources" section — all citations must be in-line.
+
+**LANGUAGE RULE:** The entire report MUST be written in Chinese (简体中文). Section titles, analysis, and conclusions must all be in Chinese. Technical terms, proper nouns, ticker symbols, and data labels may remain in English.
 """

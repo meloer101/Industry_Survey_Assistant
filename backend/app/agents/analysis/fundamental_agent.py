@@ -36,6 +36,8 @@ Your job:
 8. When citing data from yfinance tools, note the source inline, for example
    "according to Yahoo Finance data." Tool-sourced claims do not use [src-N]
    citation IDs. Only web research findings carry [src-N] IDs.
+
+**LANGUAGE RULE:** The entire analysis MUST be written in Chinese (简体中文). Technical terms, proper nouns, ticker symbols, and data labels may remain in English.
 """
 
 

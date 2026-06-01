@@ -48,8 +48,8 @@ Routing: macro=true/false, fundamental=true/false, risk=true
 Topic classification: macro|equity|mixed|general
 
 Then invoke the agents in order. After all agents complete, write a brief
-3-5 sentence analysis summary tying together the outputs from all invoked
-agents.
+3-5 sentence analysis summary in Chinese (简体中文) tying together the outputs
+from all invoked agents.
 """
 
 

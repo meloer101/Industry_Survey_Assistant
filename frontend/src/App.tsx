@@ -51,6 +51,7 @@ export default function App() {
   const analysisOutputsRef = useRef<AnalysisOutputs>({});
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const finalReportReceivedRef = useRef(false);
   const location = useLocation();
   const autoSubmittedRef = useRef(false);
 
@@ -96,7 +97,7 @@ export default function App() {
       }]));
     }
 
-    if (textParts.length > 0 && agent !== "report_composer_with_citations") {
+    if (textParts.length > 0 && agent !== "report_composer_with_citations" && !finalReportReceivedRef.current) {
       if (agent !== "interactive_planner_agent") {
         const eventTitle = getEventTitle(agent);
         setMessageEvents(prev => new Map(prev).set(aiMessageId, [...(prev.get(aiMessageId) || []), {
@@ -121,6 +122,7 @@ export default function App() {
     }
 
     if (agent === "report_composer_with_citations" && finalReportWithCitations) {
+      finalReportReceivedRef.current = true;
       const finalReportMessageId = Date.now().toString() + "_final";
       const snapshotOutputs = { ...analysisOutputsRef.current };
       setMessages(prev => [...prev, {
@@ -170,6 +172,7 @@ export default function App() {
       const aiMessageId = Date.now().toString() + "_ai";
       currentAgentRef.current = '';
       accumulatedTextRef.current = '';
+      finalReportReceivedRef.current = false;
 
       setMessages(prev => [...prev, {
         type: "ai",
@@ -343,6 +346,7 @@ export default function App() {
     setWebsiteCount(0);
     setIsLoading(false);
     analysisOutputsRef.current = {};
+    finalReportReceivedRef.current = false;
   }, [appName, sessionId, userId]);
 
   const handleNewResearch = useCallback(() => {
@@ -354,6 +358,7 @@ export default function App() {
     setWebsiteCount(0);
     setIsLoading(false);
     analysisOutputsRef.current = {};
+    finalReportReceivedRef.current = false;
     // Reset session so next submit creates a fresh one, but keep userId
     setSessionId(null);
     setAppName(null);
@@ -372,6 +377,7 @@ export default function App() {
     setWebsiteCount(0);
     setIsLoading(true);
     analysisOutputsRef.current = {};
+    finalReportReceivedRef.current = false;
 
     try {
       const loaded = await loadSession(userId, selectedSessionId);
@@ -407,7 +413,7 @@ export default function App() {
   }, [userId]);
 
   return (
-    <div className="flex h-screen bg-white text-gray-900 font-sans antialiased">
+    <div className="app-root flex h-screen bg-[var(--app-warm-50)] text-[var(--app-warm-900)] antialiased">
       <HistoryPanel
         userId={userId}
         isOpen={isHistoryOpen}
@@ -424,13 +430,14 @@ export default function App() {
           ) : !isBackendReady ? (
             <div className="flex-1 flex flex-col items-center justify-center p-4">
               <div className="text-center space-y-4">
-                <h2 className="text-2xl font-bold text-red-500">后端服务不可用</h2>
-                <p className="text-gray-500">
+                <h2 className="text-2xl font-bold text-red-500" style={{ fontFamily: 'var(--app-font-display)' }}>后端服务不可用</h2>
+                <p className="text-[var(--app-warm-500)]">
                   无法连接到 localhost:8000，请检查后端是否已启动
                 </p>
                 <button
                   onClick={() => window.location.reload()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 text-white rounded-lg transition-colors"
+                  style={{ background: 'linear-gradient(180deg, var(--app-gold-light), var(--app-gold))' }}
                 >
                   重试
                 </button>

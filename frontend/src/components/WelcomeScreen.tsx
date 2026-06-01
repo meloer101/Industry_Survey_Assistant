@@ -20,21 +20,33 @@ export function WelcomeScreen({
   onCancel,
 }: WelcomeScreenProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden bg-gray-50">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden bg-[var(--app-warm-50)]">
       <div className="w-full max-w-2xl
-                      bg-white rounded-2xl border border-gray-200
+                      bg-white rounded-2xl border border-[var(--app-warm-200)]
                       shadow-sm p-8
-                      transition-all duration-300 hover:shadow-md hover:border-gray-300">
+                      transition-all duration-300 hover:shadow-md hover:border-[var(--app-warm-300)]">
 
         <div className="text-center space-y-3">
-          <h1 className="text-4xl font-bold text-gray-900 flex items-center justify-center gap-3">
-            📈 AI 投资研究平台
+          <h1 className="text-4xl font-semibold text-[var(--app-warm-900)] flex items-center justify-center gap-3"
+              style={{ fontFamily: 'var(--app-font-display)' }}>
+            <svg className="w-9 h-9" viewBox="0 0 40 40" fill="none">
+              <circle cx="20" cy="20" r="16" stroke="var(--app-gold)" strokeWidth="1.4" opacity="0.55" fill="none"/>
+              <line x1="20" y1="20" x2="20" y2="6" stroke="var(--app-gold)" strokeWidth="1.2" opacity="0.4"/>
+              <line x1="20" y1="20" x2="32" y2="27" stroke="var(--app-gold)" strokeWidth="1.2" opacity="0.4"/>
+              <line x1="20" y1="20" x2="8" y2="27" stroke="var(--app-gold)" strokeWidth="1.2" opacity="0.4"/>
+              <circle cx="20" cy="6" r="2.6" fill="var(--app-gold)"/>
+              <circle cx="32" cy="27" r="2.6" fill="var(--app-gold)"/>
+              <circle cx="8" cy="27" r="2.6" fill="var(--app-gold)"/>
+              <circle cx="20" cy="20" r="3.6" fill="var(--app-gold-light)"/>
+            </svg>
+            AI 投资研究平台
           </h1>
-          <p className="text-lg text-gray-600 max-w-md mx-auto">
+          <p className="text-lg text-[var(--app-warm-500)]">
             将投资研究问题转化为专业分析报告
           </p>
-          <p className="text-sm text-gray-400">
-            支持宏观政策分析、个股基本面研究、风险评估
+          <p className="text-sm text-[var(--app-warm-400)]"
+             style={{ fontFamily: 'var(--app-font-mono)', letterSpacing: '0.02em' }}>
+            8 Agents · 实时流式 · 引用溯源
           </p>
         </div>
 
@@ -44,10 +56,10 @@ export function WelcomeScreen({
               key={item.label}
               onClick={() => handleSubmit(item.query)}
               disabled={isLoading}
-              className="px-3 py-1.5 text-xs rounded-full border border-gray-200
-                         bg-gray-50 text-gray-600
-                         hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50
-                         transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-xs rounded-full border border-[var(--app-warm-200)]
+                         bg-[var(--app-warm-50)] text-[var(--app-warm-600)]
+                         hover:border-[var(--app-gold)] hover:text-[var(--app-gold-dim)] hover:bg-[var(--app-gold-bg)]
+                         transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {item.label}
             </button>

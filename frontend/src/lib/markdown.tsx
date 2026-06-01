@@ -43,12 +43,14 @@ export const mdComponents: Record<string, React.FC<MdComponentProps>> = {
     </p>
   ),
   a: ({ className, children, href, ...props }) => (
-    <Badge className="text-xs mx-0.5 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100">
+    <Badge className="text-xs mx-0.5 border hover:opacity-90"
+           style={{ backgroundColor: 'var(--app-gold-bg)', borderColor: 'var(--app-gold-ring)', color: 'var(--app-gold-dim)' }}>
       <a
         className={cn(
-          "text-blue-600 hover:text-blue-700 text-xs",
+          "text-xs",
           className,
         )}
+        style={{ color: 'var(--app-gold-dim)' }}
         href={href}
         target="_blank"
         rel="noopener noreferrer"
