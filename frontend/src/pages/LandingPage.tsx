@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/landing.css';
 
@@ -23,20 +23,20 @@ const VERIS = {
     { tag: 'CRYPTO', text: '比特币现货 ETF 对市场结构的改变' },
   ],
   features: [
-    { id: 'hitl',  pillar: true, ic: 'shield', num: '01', title: '人机协作 · HITL',
+    { id: 'hitl',  ic: 'shield', num: '01', title: '人机协作 · HITL',
       body: 'AI 不会自作主张。它先产出结构化研究计划，由你修改、补充或批准后才执行——研究方向始终可控。',
       tags: ['审批计划', '可编辑', '方向可控'] },
-    { id: 'cite',  pillar: true, ic: 'link',   num: '02', title: '引用溯源',
+    { id: 'cite',  ic: 'link',   num: '02', title: '引用溯源',
       body: '每一个观点都附带可点击的来源链接，溯源到原始网页。不是 AI 编造的，可逐条验证。',
       tags: ['来源链接', '可追溯', '可验证'] },
-    { id: 'live',  pillar: true, ic: 'pulse',  num: '03', title: '实时可视化',
+    { id: 'live',  ic: 'pulse',  num: '03', title: '实时可视化',
       body: '通过流式传输实时展示研究全程——你能看到 AI 正在搜索什么、分析什么、进展到哪一步。',
       tags: ['SSE 流式', '过程透明', '中间结果'] },
-    { id: 'multi', small: true,  ic: 'nodes',  num: '04', title: '多智能体协作',
+    { id: 'multi', ic: 'nodes',  num: '04', title: '多智能体协作',
       body: '8 个专业化 Agent 各司其职，组成层次化流水线协同，而非单模型一次性作答。' },
-    { id: 'route', small: true,  ic: 'route',  num: '05', title: '智能路由分析',
+    { id: 'route', ic: 'route',  num: '05', title: '智能路由分析',
       body: '自动判断主题属于宏观、个股还是混合类型，动态组合对应的分析模块。' },
-    { id: 'tools', small: true,  ic: 'tools',  num: '06', title: '金融专业工具',
+    { id: 'tools', ic: 'tools',  num: '06', title: '金融专业工具',
       body: '内置行情查询、美联储利率概率、FOMC 声明对比、宏观经济数据等专业数据源。' },
   ],
   flow: [
@@ -112,7 +112,145 @@ function LogoMark() {
   );
 }
 
-/* ---------- hooks ---------- */
+/* ============================================================
+   EFFECTS: Particle Canvas
+   ============================================================ */
+interface Particle {
+  x: number; y: number; vx: number; vy: number; r: number; o: number;
+}
+
+function ParticleCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouseRef = useRef({ x: -999, y: -999 });
+  const particlesRef = useRef<Particle[]>([]);
+  const animRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const resize = () => {
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      ctx.scale(dpr, dpr);
+    };
+    resize();
+
+    const COUNT = 80;
+    const W = () => window.innerWidth;
+    const H = () => window.innerHeight;
+    const CONNECT_DIST = 140;
+    const MOUSE_DIST = 200;
+
+    if (particlesRef.current.length === 0) {
+      for (let i = 0; i < COUNT; i++) {
+        particlesRef.current.push({
+          x: Math.random() * W(),
+          y: Math.random() * H(),
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          r: Math.random() * 1.5 + 0.5,
+          o: Math.random() * 0.4 + 0.1,
+        });
+      }
+    }
+
+    const onMouse = (e: MouseEvent) => { mouseRef.current = { x: e.clientX, y: e.clientY }; };
+    window.addEventListener('mousemove', onMouse);
+
+    const draw = () => {
+      const w = W(), h = H();
+      ctx.clearRect(0, 0, w, h);
+      const ps = particlesRef.current;
+      const mx = mouseRef.current.x, my = mouseRef.current.y;
+
+      for (const p of ps) {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > w) p.vx *= -1;
+        if (p.y < 0 || p.y > h) p.vy *= -1;
+
+        // mouse repulsion
+        const dmx = p.x - mx, dmy = p.y - my;
+        const dm = Math.sqrt(dmx * dmx + dmy * dmy);
+        if (dm < MOUSE_DIST && dm > 0) {
+          const force = (MOUSE_DIST - dm) / MOUSE_DIST * 0.02;
+          p.vx += (dmx / dm) * force;
+          p.vy += (dmy / dm) * force;
+        }
+
+        // damping
+        p.vx *= 0.999;
+        p.vy *= 0.999;
+      }
+
+      // connections
+      for (let i = 0; i < ps.length; i++) {
+        for (let j = i + 1; j < ps.length; j++) {
+          const dx = ps[i].x - ps[j].x, dy = ps[i].y - ps[j].y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < CONNECT_DIST) {
+            const alpha = (1 - d / CONNECT_DIST) * 0.15;
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+            ctx.lineWidth = 0.5;
+            ctx.moveTo(ps[i].x, ps[i].y);
+            ctx.lineTo(ps[j].x, ps[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // dots
+      for (const p of ps) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${p.o})`;
+        ctx.fill();
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    animRef.current = requestAnimationFrame(draw);
+    window.addEventListener('resize', resize);
+
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      window.removeEventListener('mousemove', onMouse);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="particle-canvas" />;
+}
+
+/* ============================================================
+   EFFECTS: Mouse Glow
+   ============================================================ */
+function MouseGlow() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      el.style.left = e.clientX + 'px';
+      el.style.top = e.clientY + 'px';
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+  return <div ref={ref} className="mouse-glow" />;
+}
+
+/* ============================================================
+   HOOKS
+   ============================================================ */
 function useTyping(text: string, speed = 55) {
   const [out, setOut] = useState('');
   useEffect(() => {
@@ -126,7 +264,7 @@ function useTyping(text: string, speed = 55) {
   return out;
 }
 
-function useCountUp(target: number, dur = 1400): [number, React.RefObject<HTMLDivElement | null>] {
+function useCountUp(target: number, dur = 1800): [number, React.RefObject<HTMLDivElement | null>] {
   const [val, setVal] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -137,7 +275,7 @@ function useCountUp(target: number, dur = 1400): [number, React.RefObject<HTMLDi
         const t0 = performance.now();
         const tick = (t: number) => {
           const p = Math.min((t - t0) / dur, 1);
-          const e = 1 - Math.pow(1 - p, 3);
+          const e = 1 - Math.pow(1 - p, 4);
           setVal(Math.round(target * e));
           if (p < 1) requestAnimationFrame(tick);
         };
@@ -151,7 +289,7 @@ function useCountUp(target: number, dur = 1400): [number, React.RefObject<HTMLDi
 }
 
 /* ============================================================
-   AGENT GRAPH
+   AGENT GRAPH — enhanced with glow trails
    ============================================================ */
 const AG_CX = 280, AG_CY = 262, AG_RX = 196, AG_RY = 200, AG_R = 30;
 const AG_ORDER = ['plan','web','fin','critic','macro','equity','risk','report'] as const;
@@ -190,21 +328,38 @@ function AgentGraph() {
   return (
     <div className="lagent-graph">
       <svg viewBox="0 0 560 540">
+        <defs>
+          <radialGradient id="centerGlow">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
+            <stop offset="100%" stopColor="transparent" />
+          </radialGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        <circle cx={AG_CX} cy={AG_CY} r="120" fill="url(#centerGlow)" />
+
         {AG_ORDER.map((id, i) => {
           const p = agPos(i);
           return <line key={'e'+id} className="lag-edge" x1={AG_CX} y1={AG_CY} x2={p.x} y2={p.y} />;
         })}
         {AG_ORDER.map((id, i) => {
           const p = agPos(i), q = agPos((i+1) % AG_ORDER.length);
-          return <line key={'r'+id} className="lag-edge" x1={p.x} y1={p.y} x2={q.x} y2={q.y} style={{ opacity: 0.5 }} />;
+          return <line key={'r'+id} className="lag-edge" x1={p.x} y1={p.y} x2={q.x} y2={q.y} style={{ opacity: 0.3 }} />;
         })}
-        <line className="lag-flow" x1={AG_CX} y1={AG_CY} x2={ap.x} y2={ap.y} />
+        <line className="lag-flow" x1={AG_CX} y1={AG_CY} x2={ap.x} y2={ap.y} filter="url(#glow)" />
 
-        <circle cx={AG_CX} cy={AG_CY} r="34" fill="var(--lbg-3)" stroke="var(--laccent)" strokeWidth="1.4" opacity="0.85" />
-        <circle className="lag-center-core" cx={AG_CX} cy={AG_CY} r="7">
-          <animate attributeName="r" values="7;9;7" dur="1.8s" repeatCount="indefinite" />
+        <circle cx={AG_CX} cy={AG_CY} r="34" fill="var(--lbg-3)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+        <circle className="lag-center-core" cx={AG_CX} cy={AG_CY} r="5">
+          <animate attributeName="r" values="5;7;5" dur="2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite" />
         </circle>
-        <text x={AG_CX} y={AG_CY+54} textAnchor="middle" className="lag-label" style={{ fill: 'var(--link-dim)' }}>
+        <text x={AG_CX} y={AG_CY+54} textAnchor="middle" className="lag-label" style={{ fill: 'var(--link-faint)' }}>
           Orchestrator
         </text>
 
@@ -263,6 +418,9 @@ function ExampleChips({ onSelect }: { onSelect: (q: string) => void }) {
   );
 }
 
+/* ============================================================
+   SECTIONS
+   ============================================================ */
 function LNav() {
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
@@ -314,15 +472,15 @@ function HeroA({ onNavigate }: { onNavigate: (q?: string) => void }) {
               <span className="lpill-live"><span className="ldot"></span>8 Agents · 实时流式</span>
             </div>
             <h1 className="ldisplay lreveal" data-d="1">
-              把一个<span className="lgrad-gold">{typed}</span>
-              <span className="lmono">|</span><br />
-              变成一份可溯源的研究报告
+              把一个<span className="ltyped">{typed}</span>
+              <span className="lcursor"></span><br />
+              变成一份可溯源的<br />研究报告
             </h1>
             <p className="lsub lreveal" data-d="2">
               输入研究问题，8 个专业化 AI Agent 协同完成从计划、调研、分析到成稿的全流程——
               每个观点都附带可点击的引用来源。
             </p>
-            <div className="lreveal" data-d="3" style={{ maxWidth: 460, marginBottom: 14 }}>
+            <div className="lreveal" data-d="3" style={{ maxWidth: 480, marginBottom: 14 }}>
               <SearchBox onGo={(q) => onNavigate(q)} />
             </div>
             <div className="lreveal" data-d="4">
@@ -333,6 +491,37 @@ function HeroA({ onNavigate }: { onNavigate: (q?: string) => void }) {
         </div>
       </div>
     </header>
+  );
+}
+
+function FeatureCard({ c, delay }: { c: typeof VERIS.features[number]; delay: string }) {
+  const ref = useRef<HTMLElement>(null);
+
+  const onMove = useCallback((e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    el.style.setProperty('--mouse-x', (e.clientX - rect.left) + 'px');
+    el.style.setProperty('--mouse-y', (e.clientY - rect.top) + 'px');
+  }, []);
+
+  return (
+    <article
+      ref={ref}
+      className="lfeat-card lreveal"
+      data-d={delay}
+      onMouseMove={onMove}
+    >
+      <span className="lnum">{c.num}</span>
+      <div className="lic-wrap"><Icon name={c.ic} /></div>
+      <h3>{c.title}</h3>
+      <p>{c.body}</p>
+      {'tags' in c && c.tags && (
+        <div className="ltagline-row">
+          {(c.tags as readonly string[]).map((t, k) => <span className="lt" key={k}>{t}</span>)}
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -347,21 +536,7 @@ function LFeatures() {
         </div>
         <div className="lfeat-grid">
           {VERIS.features.map((c, i) => (
-            <article
-              className={`lfeat-card lreveal${'pillar' in c && c.pillar ? ' pillar' : 'small' in c && c.small ? ' small' : ''}`}
-              data-d={String((i % 3) + 1)}
-              key={c.id}
-            >
-              <span className="lnum">{c.num}</span>
-              <div className="lic-wrap"><Icon name={c.ic} /></div>
-              <h3>{c.title}</h3>
-              <p>{c.body}</p>
-              {'tags' in c && c.tags && (
-                <div className="ltagline-row">
-                  {(c.tags as readonly string[]).map((t, k) => <span className="lt" key={k}>{t}</span>)}
-                </div>
-              )}
-            </article>
+            <FeatureCard key={c.id} c={c} delay={String((i % 3) + 1)} />
           ))}
         </div>
       </div>
@@ -387,8 +562,7 @@ function LFlow() {
   const fillPct = on < 0 ? 0 : (on / (VERIS.flow.length - 1)) * 100;
 
   return (
-    <section className="lsection" id="flow"
-             style={{ background: 'linear-gradient(180deg, transparent, var(--lbg-2), transparent)' }}>
+    <section className="lsection" id="flow">
       <div className="lcontainer" ref={ref}>
         <div className="lsection-head center lreveal">
           <span className="leyebrow center">核心流程</span>
@@ -414,7 +588,7 @@ function LFlow() {
 }
 
 function StatItem({ s }: { s: { v: number; u: string; l: string } }) {
-  const [val, ref] = useCountUp(s.v, 1400);
+  const [val, ref] = useCountUp(s.v, 1800);
   return (
     <div className="lstat" ref={ref}>
       <div className="lv">{val}<span className="lu">{s.u}</span></div>
@@ -450,7 +624,7 @@ function LLiveDemo() {
           </div>
           <div className="ldemo-report lreveal" data-d="1">
             <div className="lrb">
-              <Icon name="doc" style={{ width: 16, height: 16, color: 'var(--laccent)' }} />
+              <Icon name="doc" style={{ width: 14, height: 14, color: 'var(--link-dim)' }} />
               <span className="lt">research-report.md</span>
               <span className="lprog">● 已完成</span>
             </div>
@@ -482,7 +656,8 @@ function LTechStack() {
   const doubled = [...VERIS.tech, ...VERIS.tech];
   return (
     <section className="ltech" id="tech">
-      <div className="lcontainer ltech-head">
+      <div className="lsection-divider" />
+      <div className="lcontainer ltech-head" style={{ paddingTop: 80 }}>
         <span className="leyebrow" style={{ display: 'inline-flex' }}>生产级工程</span>
         <p className="lmuted" style={{ marginTop: 14, fontSize: 16 }}>
           API 认证 · 请求限流 · 结构化日志 · Docker 容器化 · CI/CD · 会话持久化
@@ -502,18 +677,16 @@ function LTechStack() {
 function LCTA({ onNavigate }: { onNavigate: (q?: string) => void }) {
   return (
     <section className="lcta">
-      <div className="lcontainer">
-        <div className="lcta-card lreveal">
-          <span className="leyebrow center" style={{ justifyContent: 'center', display: 'inline-flex' }}>开始你的研究</span>
-          <h2 style={{ marginTop: 20 }}>把下一个投资问题<br />交给 8 个 Agent</h2>
-          <p>免费开始，一分钟得到第一份带引用来源的研究报告草案。</p>
-          <div className="lcta-search">
-            <SearchBox big placeholder="输入一个研究主题…" onGo={(q) => onNavigate(q)} />
-          </div>
-          <p className="lmono" style={{ fontSize: 12.5, color: 'var(--link-faint)', marginTop: 20 }}>
-            无需信用卡 · 你审批计划后才开始执行
-          </p>
+      <div className="lcontainer lcta-inner lreveal">
+        <span className="leyebrow center" style={{ justifyContent: 'center', display: 'inline-flex' }}>开始你的研究</span>
+        <h2 style={{ marginTop: 20 }}>把下一个投资问题<br />交给 8 个 Agent</h2>
+        <p>免费开始，一分钟得到第一份带引用来源的研究报告草案。</p>
+        <div className="lcta-search">
+          <SearchBox big placeholder="输入一个研究主题…" onGo={(q) => onNavigate(q)} />
         </div>
+        <p className="lmono" style={{ fontSize: 12, color: 'var(--link-faint)', marginTop: 24 }}>
+          无需信用卡 · 你审批计划后才开始执行
+        </p>
       </div>
     </section>
   );
@@ -555,12 +728,10 @@ function LFooter() {
 export default function LandingPage() {
   const navigate = useNavigate();
 
-  // Navigate to /app, optionally carrying a pre-filled query via router state
   const goToApp = (query?: string) => {
     navigate('/app', query ? { state: { query } } : undefined);
   };
 
-  // Scroll-reveal: add .in class when elements enter viewport
   useEffect(() => {
     const vh = () => window.innerHeight || document.documentElement.clientHeight;
     const reveal = () => {
@@ -581,6 +752,8 @@ export default function LandingPage() {
 
   return (
     <div className="landing-root">
+      <ParticleCanvas />
+      <MouseGlow />
       <LNav />
       <HeroA onNavigate={goToApp} />
       <LFeatures />
