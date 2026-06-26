@@ -1,15 +1,15 @@
 import { v4 as uuidv4 } from "uuid";
 import { devWarn } from "@/lib/logging";
 
-const API_KEY = import.meta.env.VITE_API_KEY ?? "";
+export type GetToken = () => Promise<string | null>;
 
-export function authHeaders(): Record<string, string> {
-  return API_KEY ? { "X-API-Key": API_KEY } : {};
+export async function authHeaders(getToken: GetToken): Promise<Record<string, string>> {
+  const token = await getToken();
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
+  }
+  return {};
 }
-
-export const requestHeaders = authHeaders();
-
-export const USER_ID_STORAGE_KEY = "investmentResearchUserId";
 
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -44,18 +44,18 @@ export async function retryWithBackoff<T>(
 }
 
 export async function createSession(
+  getToken: GetToken,
+  userId: string,
   signal?: AbortSignal,
-  existingUserId?: string | null,
 ): Promise<{ userId: string; sessionId: string; appName: string }> {
-  const generatedUserId = existingUserId ?? `u_${uuidv4()}`;
   const generatedSessionId = uuidv4();
   const response = await fetch(
-    `/api/apps/app/users/${generatedUserId}/sessions/${generatedSessionId}`,
+    `/api/apps/app/users/${userId}/sessions/${generatedSessionId}`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...requestHeaders,
+        ...(await authHeaders(getToken)),
       },
       signal,
     },
@@ -76,6 +76,7 @@ export async function createSession(
 }
 
 export async function cancelRun(
+  getToken: GetToken,
   appName: string,
   userId: string,
   sessionId: string,
@@ -84,7 +85,7 @@ export async function cancelRun(
     `/api/apps/${appName}/users/${userId}/sessions/${sessionId}/run`,
     {
       method: "DELETE",
-      headers: requestHeaders,
+      headers: await authHeaders(getToken),
     },
   );
   return response.ok;
@@ -125,12 +126,13 @@ const VISIBLE_AI_AUTHORS = new Set([
 ]);
 
 export async function loadSession(
+  getToken: GetToken,
   userId: string,
   sessionId: string,
 ): Promise<LoadedSession> {
   const response = await fetch(
     `/api/apps/app/users/${userId}/sessions/${sessionId}`,
-    { headers: requestHeaders },
+    { headers: await authHeaders(getToken) },
   );
   if (!response.ok) {
     throw new Error(`Failed to load session: ${response.status}`);
@@ -194,10 +196,7 @@ export async function checkBackendHealth(): Promise<boolean> {
   try {
     const response = await fetch("/api/health", {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...requestHeaders,
-      },
+      headers: { "Content-Type": "application/json" },
     });
     return response.ok;
   } catch {

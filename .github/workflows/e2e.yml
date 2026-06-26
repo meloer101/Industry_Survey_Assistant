@@ -1,0 +1,28 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Current smoke tests only cover frontend-only routes (landing page,
+      # unauthenticated /app gate). Full "input topic → report" E2E requires
+      # a running backend with LLM access — tracked as a future improvement.
+      - run: npm run test:e2e

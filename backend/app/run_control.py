@@ -6,6 +6,10 @@ import json
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
+from fastapi.responses import JSONResponse
+
+from .auth import auth_user_from_scope
+
 
 Receive = Callable[[], Awaitable[dict[str, Any]]]
 Send = Callable[[dict[str, Any]], Awaitable[None]]
@@ -72,6 +76,14 @@ class RunCancellationMiddleware:
         key = self._run_key_from_body(body)
         task = asyncio.current_task()
 
+        if key and not self._scope_user_owns_run(scope, key):
+            response = JSONResponse(
+                {"detail": "Authenticated user does not own this run"},
+                status_code=403,
+            )
+            await response(scope, receive, send)
+            return
+
         if key and task:
             self.registry.register(key, task)
         try:
@@ -120,3 +132,10 @@ class RunCancellationMiddleware:
         if not all(isinstance(value, str) and value for value in (app_name, user_id, session_id)):
             return None
         return RunKey(app_name=app_name, user_id=user_id, session_id=session_id)
+
+    @staticmethod
+    def _scope_user_owns_run(scope: dict[str, Any], key: RunKey) -> bool:
+        user = auth_user_from_scope(scope)
+        if user is None:
+            return True
+        return user.user_id == key.user_id

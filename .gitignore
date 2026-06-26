@@ -52,3 +52,10 @@ frontend/.vite/
 # ============================================
 *.log
 logs/
+
+# ============================================
+# Local tooling / generated test artifacts
+# ============================================
+.claude/
+frontend/test-results/
+frontend/playwright-report/

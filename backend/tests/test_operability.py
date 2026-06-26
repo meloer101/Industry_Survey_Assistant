@@ -65,6 +65,89 @@ async def test_run_cancellation_middleware_registers_run_sse_body():
 
 
 @pytest.mark.asyncio
+async def test_run_cancellation_middleware_rejects_user_mismatch():
+    from app.run_control import ActiveRunRegistry, RunCancellationMiddleware
+
+    async def downstream(scope, receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    middleware = RunCancellationMiddleware(downstream, registry=ActiveRunRegistry())
+    body = json.dumps(
+        {"appName": "app", "userId": "user_b", "sessionId": "s_1"}
+    ).encode()
+    sent = []
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message):
+        sent.append(message)
+
+    await middleware(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/run_sse",
+            "auth_user": {"user_id": "user_a"},
+        },
+        receive,
+        send,
+    )
+
+    assert sent[0]["status"] == 403
+
+
+def test_user_path_ownership_allows_matching_user():
+    from app.auth import AuthenticatedUser, assert_user_owns_path
+
+    assert_user_owns_path(
+        "/apps/app/users/user_a/sessions/s_1",
+        AuthenticatedUser(user_id="user_a", session_id="sess_1", auth_type="clerk"),
+    )
+
+
+def test_user_path_ownership_rejects_mismatched_user():
+    from app.auth import AuthError, AuthenticatedUser, assert_user_owns_path
+
+    with pytest.raises(AuthError) as exc:
+        assert_user_owns_path(
+            "/history/user_b",
+            AuthenticatedUser(user_id="user_a", session_id="sess_1", auth_type="clerk"),
+        )
+
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_api_key_middleware_skips_when_clerk_auth_is_disabled(monkeypatch):
+    from app.main import ApiKeyMiddleware
+
+    monkeypatch.setenv("CLERK_AUTH_ENABLED", "false")
+
+    async def downstream(scope, receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    middleware = ApiKeyMiddleware(downstream)
+    sent = []
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message):
+        sent.append(message)
+
+    await middleware(
+        {"type": "http", "method": "GET", "path": "/history/dev_user", "headers": []},
+        receive,
+        send,
+    )
+
+    assert sent[0]["status"] == 200
+
+
+@pytest.mark.asyncio
 async def test_session_cleanup_loop_runs_until_cancelled():
     from app.tools.session_cleanup import run_cleanup_loop
 

@@ -8,6 +8,10 @@ services:
       - ./backend/app/.env
     environment:
       LOG_FORMAT: json
+      # Default to false so the frontend (which has no Clerk key by default)
+      # doesn't immediately get 401s. Set CLERK_AUTH_ENABLED=true in your
+      # shell (or .env) when deploying with real Clerk credentials.
+      CLERK_AUTH_ENABLED: ${CLERK_AUTH_ENABLED:-false}
     volumes:
       - session-data:/app/app/.adk
     restart: unless-stopped
@@ -16,7 +20,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_KEY: ${VITE_API_KEY:-dev-local-key-change-in-production}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
     ports:
       - "80:80"
     depends_on:

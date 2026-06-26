@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Clock, History, PanelLeftClose, PanelLeftOpen, PlusCircle } from "lucide-react";
+import { authHeaders, type GetToken } from "@/lib/api";
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -14,7 +15,7 @@ interface HistoryItem {
 interface HistoryPanelProps {
   userId: string | null;
   isOpen: boolean;
-  requestHeaders: Record<string, string>;
+  getToken: GetToken;
   /** Increment to force a re-fetch (e.g. after a session completes or user starts a new chat). */
   refreshKey?: number;
   onToggle: () => void;
@@ -25,7 +26,7 @@ interface HistoryPanelProps {
 export function HistoryPanel({
   userId,
   isOpen,
-  requestHeaders,
+  getToken,
   refreshKey,
   onToggle,
   onSelectSession,
@@ -41,8 +42,17 @@ export function HistoryPanel({
 
     let cancelled = false;
     setIsLoading(true);
-    fetch(`/api/history/${userId}?limit=${HISTORY_PAGE_SIZE}&offset=0`, { headers: requestHeaders })
-      .then((response) => (response.ok ? response.json() : { sessions: [], has_more: false }))
+
+    const loadHistory = async () => {
+      const headers = await authHeaders(getToken);
+      const response = await fetch(
+        `/api/history/${userId}?limit=${HISTORY_PAGE_SIZE}&offset=0`,
+        { headers },
+      );
+      return response.ok ? response.json() : { sessions: [], has_more: false };
+    };
+
+    loadHistory()
       .then((data) => {
         if (!cancelled) {
           setHistory(data.sessions ?? []);
@@ -62,7 +72,7 @@ export function HistoryPanel({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, requestHeaders, userId, refreshKey]);
+  }, [getToken, isOpen, userId, refreshKey]);
 
   const loadMore = async () => {
     if (!userId || isLoadingMore) return;
@@ -71,7 +81,7 @@ export function HistoryPanel({
     try {
       const response = await fetch(
         `/api/history/${userId}?limit=${HISTORY_PAGE_SIZE}&offset=${history.length}`,
-        { headers: requestHeaders },
+        { headers: await authHeaders(getToken) },
       );
       const data = response.ok ? await response.json() : { sessions: [], has_more: false };
       setHistory((prev) => [...prev, ...(data.sessions ?? [])]);

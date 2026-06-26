@@ -198,7 +198,7 @@ Read these before writing any new code:
 ```bash
 # First-time setup: copy env templates
 cp backend/app/.env.example backend/app/.env   # then fill in real API keys
-cp frontend/.env.example frontend/.env          # set VITE_API_KEY to match APP_API_KEY
+cp frontend/.env.example frontend/.env          # set VITE_CLERK_PUBLISHABLE_KEY
 
 # Backend (from project root)
 cd backend
@@ -222,7 +222,10 @@ See `backend/app/.env.example` for the full reference. Key variables:
 ```
 DEEPSEEK_API_KEY=...         # Required: LLM provider
 TAVILY_API_KEY=...            # Required: web search
-APP_API_KEY=...               # Auth key (leave empty to disable auth in dev)
+CLERK_AUTH_ENABLED=true       # Browser user auth via Clerk Bearer tokens
+CLERK_JWT_PUBLIC_KEY=...      # Clerk JWT public key / PEM
+CLERK_AUTHORIZED_PARTIES=http://localhost:5173,http://127.0.0.1:5173
+APP_API_KEY=...               # Optional internal/dev compatibility key
 ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 

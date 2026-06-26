@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
 from fastapi.responses import Response
 
+from .auth import AuthError, assert_user_owns_path, authenticate_scope, is_clerk_auth_enabled, is_user_scoped_path
 from .logging_config import RequestIdContext, configure_logging
 from .observability import metrics_registry
 from .persistence import get_session_db_url, get_sqlite_path_from_url, list_research_history
@@ -41,18 +42,18 @@ ASGIApp = Callable[[dict[str, Any], Receive, Send], Awaitable[None]]
 
 
 class ApiKeyMiddleware:
-    """Pure-ASGI middleware: require X-API-Key header on non-exempt routes.
+    """Pure-ASGI middleware: keep X-API-Key for non-Clerk compatibility.
 
     When APP_API_KEY is not set, auth is skipped entirely (local dev mode).
-    Auth is intentionally header-only: this service does not accept cookies for
-    API authentication, keeping browser CSRF out of the current threat model.
+    Browser user auth should use Clerk Bearer tokens; API keys do not provide
+    user identity and therefore cannot bypass Clerk ownership guards.
     """
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
     async def __call__(self, scope: dict[str, Any], receive: Receive, send: Send) -> None:
-        if scope.get("type") != "http" or not APP_API_KEY:
+        if scope.get("type") != "http" or not APP_API_KEY or not is_clerk_auth_enabled():
             await self.app(scope, receive, send)
             return
 
@@ -62,6 +63,10 @@ class ApiKeyMiddleware:
             return
 
         headers = dict(scope.get("headers", []))
+        if headers.get(b"authorization", b"").decode().lower().startswith("bearer "):
+            await self.app(scope, receive, send)
+            return
+
         api_key = headers.get(API_KEY_HEADER_NAME.lower().encode(), b"").decode()
         if api_key != APP_API_KEY:
             response = JSONResponse(
@@ -71,6 +76,60 @@ class ApiKeyMiddleware:
             await response(scope, receive, send)
             return
 
+        await self.app(scope, receive, send)
+
+
+class ClerkAuthMiddleware:
+    """Pure-ASGI middleware: resolve Clerk user and enforce path ownership.
+
+    Requests that carry an X-API-Key header (instead of a Bearer token) are
+    passed through to ApiKeyMiddleware for validation — Clerk auth does not
+    apply to them.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path: str = scope.get("path", "")
+        if scope.get("method") == "OPTIONS" or any(path.startswith(p) for p in _EXEMPT_PREFIXES):
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        has_api_key = bool(
+            headers.get(API_KEY_HEADER_NAME.lower().encode(), b"").decode()
+        )
+        has_bearer = (
+            headers.get(b"authorization", b"").decode().lower().startswith("bearer ")
+        )
+        if has_api_key and not has_bearer:
+            # API keys are for server-to-server/internal use only.
+            # User-scoped paths always require a Clerk Bearer token so that
+            # ownership can be enforced — an API key carries no user identity.
+            if is_user_scoped_path(path):
+                response = JSONResponse(
+                    {"detail": "Clerk bearer token required for user-scoped paths"},
+                    status_code=401,
+                )
+                await response(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+            return
+
+        try:
+            user = authenticate_scope(scope)
+            assert_user_owns_path(path, user)
+        except AuthError as exc:
+            response = JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+            await response(scope, receive, send)
+            return
+
+        scope["auth_user"] = user
         await self.app(scope, receive, send)
 
 
@@ -121,6 +180,7 @@ def create_app():
     # are handled by CORS before reaching the auth check.
     fast_api_app.add_middleware(RunCancellationMiddleware)
     fast_api_app.add_middleware(ApiKeyMiddleware)
+    fast_api_app.add_middleware(ClerkAuthMiddleware)
     fast_api_app.add_middleware(RequestIdMiddleware)
 
     fast_api_app.router.routes = [

@@ -41,12 +41,13 @@ describe("HistoryPanel pagination", () => {
         }),
       });
     vi.stubGlobal("fetch", fetchMock);
+    const getToken = vi.fn().mockResolvedValue("session-token");
 
     render(
       <HistoryPanel
         userId="u_1"
         isOpen={true}
-        requestHeaders={{}}
+        getToken={getToken}
         onToggle={() => undefined}
         onSelectSession={() => undefined}
       />,
@@ -60,7 +61,7 @@ describe("HistoryPanel pagination", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenLastCalledWith(
         "/api/history/u_1?limit=20&offset=1",
-        { headers: {} },
+        { headers: { Authorization: "Bearer session-token" } },
       );
     });
   });
